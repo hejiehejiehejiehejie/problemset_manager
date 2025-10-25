@@ -1,4 +1,4 @@
-/* 题单管理器（LeetCode 风格 UI：吸顶、卡片化小屏、左边缘展开按钮、按钮不竖排） */
+/* 题单管理器（原始功能 + 窄屏工具栏里的展开按钮 + 无动画侧栏） */
 
 const STORAGE_KEY = "problem-lists:v1";
 const UNCATEGORIZED_NAME = "未分类";
@@ -183,7 +183,7 @@ function createDefaultState() {
   ensureTagLibrary(st); return st;
 }
 
-/* 标签库操作 */
+/* 标签库操作（同原版） */
 function getCategories() { return state.tagLibrary.categories; }
 function findCatById(id) { return getCategories().find((c) => c.id === id); }
 function findOrCreateUncategorized() {
@@ -301,7 +301,7 @@ function renderTitleCell(p, cell) {
     cell.innerHTML=""; const form=document.createElement("div"); form.style.display="inline-flex"; form.style.alignItems="center"; form.style.gap="6px";
     const input=document.createElement("input"); input.type="text"; input.placeholder="输入标题"; input.value=p.title||""; input.className="input-sm";
     const save=document.createElement("button"); save.textContent="保存"; save.className="btn-primary btn-xxs";
-    const cancel=document.createElement("button"); cancel.textContent="取消"; cancel.className="btn-secondary btn-xxs";
+    const cancel=document.createElement("button"); cancel.textContent="取消"; cancel.className="btn-xxs";
     const actions=document.createElement("div"); actions.className="edit-actions"; actions.appendChild(save); actions.appendChild(cancel);
     save.addEventListener("click", ()=>{ p.title=input.value.trim(); persist(); renderLists(); showView(); });
     cancel.addEventListener("click", showView);
@@ -324,7 +324,7 @@ function renderDifficultyCell(p, cell) {
     cell.innerHTML=""; const form=document.createElement("div"); form.style.display="inline-flex"; form.style.alignItems="center"; form.style.gap="6px";
     const input=document.createElement("input"); input.type="text"; input.placeholder="例如：入门 / 中等 / 困难+"; input.value=p.difficulty||""; input.className="input-sm";
     const save=document.createElement("button"); save.textContent="保存"; save.className="btn-primary btn-xxs";
-    const cancel=document.createElement("button"); cancel.textContent="取消"; cancel.className="btn-secondary btn-xxs";
+    const cancel=document.createElement("button"); cancel.textContent="取消"; cancel.className="btn-xxs";
     const actions=document.createElement("div"); actions.className="edit-actions"; actions.appendChild(save); actions.appendChild(cancel);
     save.addEventListener("click", ()=>{ p.difficulty=input.value.trim(); persist(); showView(); });
     cancel.addEventListener("click", showView);
@@ -348,7 +348,7 @@ function renderProblemLinkCell(p, cell) {
     cell.innerHTML=""; const form=document.createElement("div"); form.style.display="inline-flex"; form.style.alignItems="center"; form.style.gap="6px";
     const input=document.createElement("input"); input.type="url"; input.placeholder="https://..."; input.value=p.url||""; input.className="input-sm";
     const save=document.createElement("button"); save.textContent="保存"; save.className="btn-primary btn-xxs";
-    const cancel=document.createElement("button"); cancel.textContent="取消"; cancel.className="btn-secondary btn-xxs";
+    const cancel=document.createElement("button"); cancel.textContent="取消"; cancel.className="btn-xxs";
     const actions=document.createElement("div"); actions.className="edit-actions"; actions.appendChild(save); actions.appendChild(cancel);
     save.addEventListener("click", ()=>{ p.url=input.value.trim(); const changed=trySetTitleFromUrl(p); persist(); if(changed) { renderProblems(); renderLists(); } else { showView(); } });
     cancel.addEventListener("click", showView);
@@ -373,7 +373,7 @@ function renderCodeLinkCell(p, cell) {
     cell.innerHTML=""; const form=document.createElement("div"); form.style.display="inline-flex"; form.style.alignItems="center"; form.style.gap="6px";
     const input=document.createElement("input"); input.type="url"; input.placeholder="https://github.com/... 或其他链接"; input.value=p.codeUrl||""; input.className="input-sm";
     const save=document.createElement("button"); save.textContent="保存"; save.className="btn-primary btn-xxs";
-    const cancel=document.createElement("button"); cancel.textContent="取消"; cancel.className="btn-secondary btn-xxs";
+    const cancel=document.createElement("button"); cancel.textContent="取消"; cancel.className="btn-xxs";
     const actions=document.createElement("div"); actions.className="edit-actions"; actions.appendChild(save); actions.appendChild(cancel);
     save.addEventListener("click", ()=>{ p.codeUrl=input.value.trim(); persist(); showView(); });
     cancel.addEventListener("click", showView);
@@ -391,7 +391,7 @@ function matchQuery(p, q) {
   return hay.includes(s);
 }
 
-/* 标签选择 popover */
+/* 标签选择 popover（原版） */
 let currentPopover = null;
 let currentPopoverAnchor = null;
 let __popRaf = 0;
@@ -442,8 +442,6 @@ function togglePopover(anchorEl, builder) {
   if (currentPopover) closePopover();
   const pop = builder();
   document.body.appendChild(pop);
-  const w = pop.getBoundingClientRect().width;
-  pop.style.width = w + "px";
   currentPopover = pop;
   currentPopoverAnchor = anchorEl;
   positionPopover(pop, anchorEl);
@@ -510,7 +508,6 @@ function renderProblems() {
     const tr=el("#problem-row-tpl").content.firstElementChild.cloneNode(true);
     tr.classList.add("problem-row"); tr.dataset.pid=p.id;
 
-    // 设置 data-label 以支持小屏卡片化
     el(".cell-title", tr).setAttribute("data-label","标题");
     el(".cell-link", tr).setAttribute("data-label","题目链接");
     el(".cell-difficulty", tr).setAttribute("data-label","难度");
@@ -624,7 +621,7 @@ function renderTagManager(){
     const controls=document.createElement("div"); controls.className="lib-controls";
     function renderAddButton(){
       controls.innerHTML="";
-      const addBtn=button("添加标签","btn-secondary btn-xxs");
+      const addBtn=button("添加标签","btn-xxs");
       addBtn.addEventListener("click", showAddInput);
       controls.appendChild(addBtn);
     }
@@ -632,7 +629,7 @@ function renderTagManager(){
       controls.innerHTML="";
       const inputEl=input("text","",`在「${c.name}」新增标签后回车`); inputEl.classList.add("input-sm"); inputEl.style.maxWidth="260px";
       const okBtn=button("确定","btn-primary btn-xxs");
-      const cancelBtn=button("取消","btn-secondary btn-xxs");
+      const cancelBtn=button("取消","btn-xxs");
       okBtn.addEventListener("click",()=>{
         const v=(inputEl.value||"").trim(); if(!v){ inputEl.focus(); return; }
         if (!addTagToCategory(c.id,v)) { alert("新增失败：标签名为空"); return; }
@@ -738,7 +735,6 @@ function bindEvents(){
     const name=el("#list-name-input").value.trim(); list.name=name||"未命名题单"; persist(); renderLists(); renderToolbar();
   });
 
-  // 名称输入框失焦/回车自动保存
   const nameInput = el("#list-name-input");
   if (nameInput) {
     nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); nameInput.blur(); } });
@@ -816,42 +812,40 @@ function bindEvents(){
     }
   });
 
-  // 小屏侧栏抽屉与边缘展开按钮
+  // 小屏侧栏抽屉（行内“展开”按钮 + 遮罩 + 手势/ESC）
   const sidebar = el(".sidebar");
   const sidebarBackdrop = el("#sidebar-backdrop");
   const edgeOpen = el("#sidebar-edge-open");
 
   if (sidebar && sidebarBackdrop) {
+    const openSidebar = () => {
+      if (window.innerWidth > 900) return;
+      sidebar.classList.add("open");
+      sidebarBackdrop.classList.add("show");
+    };
     const closeSidebar = () => {
       sidebar.classList.remove("open");
       sidebarBackdrop.classList.remove("show");
-      updateEdgeVisibility();
-    };
-    const openSidebar = () => {
-      sidebar.classList.add("open");
-      sidebarBackdrop.classList.add("show");
-      updateEdgeVisibility();
-    };
-    const updateEdgeVisibility = () => {
-      if (!edgeOpen) return;
-      if (window.innerWidth <= 900 && !sidebar.classList.contains("open")) {
-        edgeOpen.style.display = "inline-flex";
-      } else {
-        edgeOpen.style.display = "none";
-      }
     };
 
-    if (edgeOpen) edgeOpen.addEventListener("click", openSidebar);
-    sidebarBackdrop.addEventListener("click", closeSidebar);
-    window.addEventListener("resize", () => { if (window.innerWidth > 900) closeSidebar(); updateEdgeVisibility(); });
+    if (edgeOpen) {
+      const onOpen = (e) => { e.preventDefault(); e.stopPropagation(); openSidebar(); };
+      edgeOpen.addEventListener("click", onOpen);
+      edgeOpen.addEventListener("touchend", onOpen, { passive: false });
+    }
+    sidebarBackdrop.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); closeSidebar(); });
 
-    // 触摸边缘右划打开
+    window.addEventListener("resize", () => { if (window.innerWidth > 900) closeSidebar(); });
+
+    // 左缘右划打开（可选保留）
     let startX=0,startY=0,tracking=false; const EDGE=20, OPEN_THRESHOLD=50, MAX_ANGLE=25;
     window.addEventListener("touchstart",(e)=>{ if(window.innerWidth>900) return; if(sidebar.classList.contains("open")) return; const t=e.touches[0]; if(t.clientX<=EDGE){ startX=t.clientX; startY=t.clientY; tracking=true; }},{passive:true});
     window.addEventListener("touchmove",(e)=>{ if(!tracking) return; const t=e.touches[0]; const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY); const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI; if(dx>0 && angle<MAX_ANGLE) e.preventDefault();},{passive:false});
     window.addEventListener("touchend",(e)=>{ if(!tracking) return; tracking=false; const t=e.changedTouches[0]; const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY); const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI; if(dx>=OPEN_THRESHOLD && angle<MAX_ANGLE) openSidebar(); });
 
-    updateEdgeVisibility();
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && window.innerWidth <= 900 && sidebar.classList.contains("open")) closeSidebar();
+    });
   }
 
   /* 随机 CF 抽题：预设、竖向微调、记忆化、执行 */
@@ -916,7 +910,6 @@ function bindEvents(){
 
         const items = picked.map(p => cfProblemToAppItem(p, includeTags));
 
-        // 去重：按 URL 去重
         const existingUrls = new Set((list.problems||[]).map(x => (x.url||"").trim()));
         const deduped = items.filter(x => x.url && !existingUrls.has(x.url.trim()));
 
@@ -929,7 +922,6 @@ function bindEvents(){
     });
   }
 
-  // 全局 Esc 关闭弹层/弹窗
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { closePopover(); closeTagsModal(); closeCFRandomModal(); }
   });

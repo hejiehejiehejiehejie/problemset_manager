@@ -25,16 +25,10 @@
       </div>
     </aside>
 
-    <!-- 左边缘展开按钮（小屏显示） -->
-    <button id="sidebar-edge-open" class="edge-open-btn" title="展开题单" aria-label="展开题单">▸ 题单</button>
-
     <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
 
     <main class="main">
       <div class="toolbar">
-        <!-- 工具栏按钮在小屏中不再占整行 -->
-        <button id="sidebar-toggle" aria-expanded="false" title="展开/收起题单">题单 ▾</button>
-
         <div class="current-list">
           <input id="list-name-input" placeholder="未命名题单" />
           <button id="rename-list-btn" title="重命名">重命名</button>
@@ -43,10 +37,12 @@
 
         <div class="search">
           <input id="search-input" placeholder="搜索：标题 / 链接 / 难度 / 标签" />
-          <button id="clear-search-btn">清空</button>
         </div>
 
         <div class="actions">
+          <!-- 移到工具栏的“展开题单”按钮（仅小屏显示），紧贴“新增题目”左侧 -->
+          <button id="sidebar-edge-open" class="edge-open-btn edge-inline" title="展开题单" aria-label="展开题单">▸</button>
+
           <button id="add-problem-btn">新增题目</button>
           <button id="export-list-btn" title="导出当前题单">导出题单</button>
           <label class="import-label" title="导入单个题单">
@@ -87,7 +83,7 @@
     </tr>
   </template>
 
-  <!-- 标签库管理面板（顶部 sticky，底部关闭已移除） -->
+  <!-- 标签库管理面板 -->
   <div id="tags-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="tags-modal-title">
     <div class="modal-content">
       <div class="modal-header">
