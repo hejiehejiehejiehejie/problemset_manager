@@ -1,4 +1,8 @@
-/* 题单管理器（原始功能 + 窄屏工具栏里的展开按钮 + 无动画侧栏） */
+/* 题单管理器（原始功能 + 窄屏工具栏里的展开按钮 + 无动画侧栏）
+   增强：随机CF抽题支持
+   - 排除已AC（需填写 handle）
+   - 若设置了分数上下限，则自动排除无rating的题目
+*/
 
 const STORAGE_KEY = "problem-lists:v1";
 const UNCATEGORIZED_NAME = "未分类";
@@ -656,7 +660,7 @@ function renderTagManager(){
   });
 }
 
-/* 随机 CF 抽题 + 偏好记忆 */
+/* 随机 CF 抽题 + 偏好记忆 + 限制 */
 const CF_CACHE_KEY="cf:problemset:v1"; const CF_CACHE_TTL_MS=1000*60*60*24;
 
 const CF_PREF_KEYS = {
@@ -665,6 +669,8 @@ const CF_PREF_KEYS = {
   ratingMax: "cf:random:ratingMax",
   tags: "cf:random:tags",
   count: "cf:random:count",
+  handle: "cf:random:handle",               // 新增
+  excludeSolved: "cf:random:excludeSolved", // 新增
 };
 function getPref(key, defVal=null) { try { const v = localStorage.getItem(key); return v === null ? defVal : v; } catch { return defVal; } }
 function setPref(key, val) { try { if (val==null || val==="") localStorage.removeItem(key); else localStorage.setItem(key, String(val)); } catch {} }
@@ -674,11 +680,15 @@ function applyCFRandomPrefs() {
   const maxEl = el("#cf-rating-max");
   const tagsEl = el("#cf-tags");
   const countEl = el("#cf-count");
+  const handleEl = el("#cf-handle");
+  const exSolvedEl = el("#cf-exclude-solved");
   if (ck) ck.checked = getPref(CF_PREF_KEYS.includeTags, "1") !== "0";
   if (minEl) minEl.value = getPref(CF_PREF_KEYS.ratingMin, "") || "";
   if (maxEl) maxEl.value = getPref(CF_PREF_KEYS.ratingMax, "") || "";
   if (tagsEl) tagsEl.value = getPref(CF_PREF_KEYS.tags, "") || "";
   if (countEl) countEl.value = getPref(CF_PREF_KEYS.count, "1") || "1";
+  if (handleEl) handleEl.value = getPref(CF_PREF_KEYS.handle, "") || "";
+  if (exSolvedEl) exSolvedEl.checked = getPref(CF_PREF_KEYS.excludeSolved, "0") === "1";
 }
 function saveCFRandomPrefsFromForm() {
   const ck = el("#cf-include-tags");
@@ -686,11 +696,15 @@ function saveCFRandomPrefsFromForm() {
   const maxEl = el("#cf-rating-max");
   const tagsEl = el("#cf-tags");
   const countEl = el("#cf-count");
+  const handleEl = el("#cf-handle");
+  const exSolvedEl = el("#cf-exclude-solved");
   if (ck) setPref(CF_PREF_KEYS.includeTags, ck.checked ? "1" : "0");
   if (minEl) setPref(CF_PREF_KEYS.ratingMin, minEl.value.trim());
   if (maxEl) setPref(CF_PREF_KEYS.ratingMax, maxEl.value.trim());
   if (tagsEl) setPref(CF_PREF_KEYS.tags, tagsEl.value.trim());
   if (countEl) setPref(CF_PREF_KEYS.count, countEl.value.trim() || "1");
+  if (handleEl) setPref(CF_PREF_KEYS.handle, handleEl.value.trim());
+  if (exSolvedEl) setPref(CF_PREF_KEYS.excludeSolved, exSolvedEl.checked ? "1" : "0");
 }
 
 async function loadCFProblemset(force=false){
@@ -701,12 +715,54 @@ async function loadCFProblemset(force=false){
   const json=await resp.json(); if (json.status!=="OK") throw new Error("CF API 错误");
   const data={ problems: json.result.problems||[], ts: Date.now() }; localStorage.setItem(CF_CACHE_KEY, JSON.stringify(data)); return data;
 }
-function pickRandomCF(problems, { ratingMin, ratingMax, tags, count }) {
+
+/* 加载用户已AC集合（缓存12小时）；key 形如 contestId:index */
+const CF_SOLVED_CACHE_TTL_MS = 1000 * 60 * 60 * 12;
+function cfSolvedCacheKey(handle){ return `cf:solved:${handle}`; }
+async function loadCFSolvedSet(handle) {
+  const h = String(handle || "").trim();
+  if (!h) return new Set();
+  try {
+    const k = cfSolvedCacheKey(h);
+    const cached = localStorage.getItem(k);
+    if (cached) {
+      const obj = JSON.parse(cached);
+      if (obj && Array.isArray(obj.items) && (Date.now() - (obj.ts || 0)) < CF_SOLVED_CACHE_TTL_MS) {
+        return new Set(obj.items);
+      }
+    }
+    const resp = await fetch(`https://codeforces.com/api/user.status?handle=${encodeURIComponent(h)}&from=1&count=100000`);
+    const json = await resp.json();
+    if (json.status !== "OK") throw new Error("CF user.status 错误");
+    const items = [];
+    for (const s of (json.result || [])) {
+      if (s.verdict === "OK" && s.problem && s.problem.contestId && s.problem.index) {
+        items.push(`${s.problem.contestId}:${String(s.problem.index).toUpperCase()}`);
+      }
+    }
+    const ded = Array.from(new Set(items));
+    localStorage.setItem(k, JSON.stringify({ ts: Date.now(), items: ded }));
+    return new Set(ded);
+  } catch (e) {
+    console.warn("加载已AC题目失败", e);
+    return new Set();
+  }
+}
+
+/* 随机策略：支持 requireRated / excludeSolved */
+function pickRandomCF(problems, { ratingMin, ratingMax, tags, count, requireRated = false, excludeSolved = false, solvedSet = null }) {
   let pool=problems.filter((p)=>{
     const r=typeof p.rating==="number"?p.rating:null;
+    if (requireRated && r == null) return false;                 // 限分时排除无rating
     if (ratingMin!=null && r!=null && r<ratingMin) return false;
     if (ratingMax!=null && r!=null && r>ratingMax) return false;
+
     if (tags && tags.length){ const own=new Set((p.tags||[]).map(t=>t.toLowerCase())); for (const t of tags){ if(!own.has(t)) return false; } }
+
+    if (excludeSolved && solvedSet && solvedSet.size) {
+      const key = `${p.contestId}:${String(p.index).toUpperCase()}`;
+      if (solvedSet.has(key)) return false;                      // 排除已AC
+    }
     return true;
   });
   if (!pool.length) return [];
@@ -837,7 +893,7 @@ function bindEvents(){
 
     window.addEventListener("resize", () => { if (window.innerWidth > 900) closeSidebar(); });
 
-    // 左缘右划打开（可选保留）
+    // 左缘右划打开
     let startX=0,startY=0,tracking=false; const EDGE=20, OPEN_THRESHOLD=50, MAX_ANGLE=25;
     window.addEventListener("touchstart",(e)=>{ if(window.innerWidth>900) return; if(sidebar.classList.contains("open")) return; const t=e.touches[0]; if(t.clientX<=EDGE){ startX=t.clientX; startY=t.clientY; tracking=true; }},{passive:true});
     window.addEventListener("touchmove",(e)=>{ if(!tracking) return; const t=e.touches[0]; const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY); const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI; if(dx>0 && angle<MAX_ANGLE) e.preventDefault();},{passive:false});
@@ -848,7 +904,7 @@ function bindEvents(){
     });
   }
 
-  /* 随机 CF 抽题：预设、竖向微调、记忆化、执行 */
+  /* 随机 CF 抽题：预设、竖向微调、记忆化、执行 + 限制 */
   const cfBtn=el("#cf-random-btn"), cfModal=el("#cf-random-modal");
   if (cfBtn && cfModal) {
     const cfCloseTop = el("#cf-random-close");
@@ -880,6 +936,8 @@ function bindEvents(){
     const maxEl = el("#cf-rating-max");
     const tagsEl = el("#cf-tags");
     const countEl = el("#cf-count");
+    const handleEl = el("#cf-handle");
+    const exSolvedEl = el("#cf-exclude-solved");
     if (minEl) minEl.addEventListener("change", () => setPref(CF_PREF_KEYS.ratingMin, minEl.value.trim()));
     if (maxEl) maxEl.addEventListener("change", () => setPref(CF_PREF_KEYS.ratingMax, maxEl.value.trim()));
     if (tagsEl) tagsEl.addEventListener("change", () => setPref(CF_PREF_KEYS.tags, tagsEl.value.trim()));
@@ -888,6 +946,8 @@ function bindEvents(){
       countEl.value = String(c);
       setPref(CF_PREF_KEYS.count, countEl.value);
     });
+    if (handleEl) handleEl.addEventListener("change", () => setPref(CF_PREF_KEYS.handle, handleEl.value.trim()));
+    if (exSolvedEl) exSolvedEl.addEventListener("change", () => setPref(CF_PREF_KEYS.excludeSolved, exSolvedEl.checked ? "1" : "0"));
 
     el("#cf-random-run").addEventListener("click", async ()=>{
       try {
@@ -899,13 +959,23 @@ function bindEvents(){
         const countRaw=el("#cf-count").value.trim();
         const includeTags=!!el("#cf-include-tags").checked;
 
+        const handle = (el("#cf-handle")?.value || "").trim();
+        const excludeSolved = !!el("#cf-exclude-solved")?.checked;
+
         const ratingMin=ratingMinRaw?Number(ratingMinRaw):null;
         const ratingMax=ratingMaxRaw?Number(ratingMaxRaw):null;
+        const requireRated = (ratingMin!=null || ratingMax!=null); // 限分时排除无rating
         const tags=tagsRaw?tagsRaw.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean):[];
         const count=countRaw?Number(countRaw):1;
 
         const { problems } = await loadCFProblemset(false);
-        const picked = pickRandomCF(problems, { ratingMin, ratingMax, tags, count });
+
+        let solvedSet = null;
+        if (excludeSolved && handle) {
+          solvedSet = await loadCFSolvedSet(handle);
+        }
+
+        const picked = pickRandomCF(problems, { ratingMin, ratingMax, tags, count, requireRated, excludeSolved, solvedSet });
         if (!picked.length) { alert("没有匹配的题目，请调整筛选条件"); return; }
 
         const items = picked.map(p => cfProblemToAppItem(p, includeTags));

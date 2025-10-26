@@ -609,3 +609,45 @@ input[type="number"]::-webkit-inner-spin-button {
   height: 24px;
   padding: 2px 10px;
 }
+/* CF 抽题选项：与“写入题目标签”同款风格，左对齐 */
+.cf-options {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;         /* 窄屏自动换行，保持左对齐 */
+}
+
+.cf-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.cf-opt input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-2);
+}
+
+.cf-handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.cf-handle label {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.cf-handle .input-sm {
+  width: 220px;
+  height: 30px;           /* 与其他 input-sm 对齐 */
+}
+
+/* 窄屏微调 */
+@media (max-width: 520px) {
+  .cf-handle .input-sm { width: 180px; }
+}

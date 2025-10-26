@@ -153,11 +153,22 @@
           </div>
         </div>
 
-        <div style="margin-top:10px; display:flex; gap:12px; align-items:center;">
-          <label style="display:inline-flex; align-items:center; gap:6px;">
-            <input id="cf-include-tags" type="checkbox" checked />
-            <span>写入题目标签</span>
-          </label>
+        <div style="margin-top:10px;">
+          <div class="small" style="margin-bottom:6px;">选项</div>
+          <div class="cf-options">
+            <label class="cf-opt">
+              <input id="cf-include-tags" type="checkbox" checked />
+              <span>写入题目标签</span>
+            </label>
+            <label class="cf-opt">
+              <input id="cf-exclude-solved" type="checkbox" />
+              <span>排除已 AC</span>
+            </label>
+            <div class="cf-handle">
+              <label for="cf-handle">CF 账号</label>
+              <input id="cf-handle" class="input-sm" placeholder="如 tourist（可留空）" />
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
