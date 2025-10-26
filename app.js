@@ -1,6 +1,6 @@
 /* 题单管理器（原始功能 + 窄屏工具栏里的展开按钮 + 无动画侧栏）
    增强：随机CF抽题支持
-   - 排除已AC（需填写 handle）
+   - 排除已AC（需填写 handle，含合法性校验）
    - 若设置了分数上下限，则自动排除无rating的题目
 */
 
@@ -669,8 +669,8 @@ const CF_PREF_KEYS = {
   ratingMax: "cf:random:ratingMax",
   tags: "cf:random:tags",
   count: "cf:random:count",
-  handle: "cf:random:handle",               // 新增
-  excludeSolved: "cf:random:excludeSolved", // 新增
+  handle: "cf:random:handle",
+  excludeSolved: "cf:random:excludeSolved",
 };
 function getPref(key, defVal=null) { try { const v = localStorage.getItem(key); return v === null ? defVal : v; } catch { return defVal; } }
 function setPref(key, val) { try { if (val==null || val==="") localStorage.removeItem(key); else localStorage.setItem(key, String(val)); } catch {} }
@@ -746,6 +746,28 @@ async function loadCFSolvedSet(handle) {
   } catch (e) {
     console.warn("加载已AC题目失败", e);
     return new Set();
+  }
+}
+
+/* 账号合法性校验（缓存1小时） */
+async function validateCFHandle(handle) {
+  const h = String(handle || "").trim();
+  if (!h) return { ok: true, reason: "empty" }; // 允许为空（仅在未勾选排除AC时）
+  try {
+    const cacheKey = "cf:handle:valid:" + h.toLowerCase();
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const obj = JSON.parse(cached);
+      if (obj && Date.now() - (obj.ts || 0) < 1000 * 60 * 60) return { ok: obj.ok, reason: obj.reason || "cache" };
+    }
+    const resp = await fetch("https://codeforces.com/api/user.info?handles=" + encodeURIComponent(h));
+    const json = await resp.json();
+    const ok = json.status === "OK" && Array.isArray(json.result) && json.result.length > 0;
+    const out = { ok, reason: ok ? "ok" : "not_found" };
+    localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), ...out }));
+    return out;
+  } catch {
+    return { ok: false, reason: "network" };
   }
 }
 
@@ -904,13 +926,31 @@ function bindEvents(){
     });
   }
 
-  /* 随机 CF 抽题：预设、竖向微调、记忆化、执行 + 限制 */
+  /* 随机 CF 抽题：预设、竖向微调、记忆化、执行 + 限制 + 账号校验 */
   const cfBtn=el("#cf-random-btn"), cfModal=el("#cf-random-modal");
   if (cfBtn && cfModal) {
     const cfCloseTop = el("#cf-random-close");
     if (cfCloseTop) cfCloseTop.addEventListener("click", closeCFRandomModal);
 
-    cfBtn.addEventListener("click", () => { applyCFRandomPrefs(); openCFRandomModal(); });
+    cfBtn.addEventListener("click", () => {
+      applyCFRandomPrefs();
+      // 弹窗打开后，给 handle 输入做防抖校验提示（若存在提示位）
+      const handleEl = el("#cf-handle");
+      const handleMsg = el("#cf-handle-msg");
+      if (handleEl && handleMsg) {
+        let timer = 0;
+        const showMsg = (st) => {
+          handleMsg.className = "cf-msg" + (st.ok ? " ok" : " error");
+          if (!handleEl.value.trim()) { handleMsg.textContent = ""; return; }
+          handleMsg.textContent = st.ok ? "账号有效" : (st.reason === "not_found" ? "账号不存在" : "网络错误，稍后重试");
+        };
+        const runCheck = async () => { const st = await validateCFHandle(handleEl.value); showMsg(st); };
+        handleEl.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(runCheck, 350); }, { once: true });
+        // 初次打开不自动校验，只在首次输入或失焦时触发
+        handleEl.addEventListener("blur", runCheck, { once: true });
+      }
+      openCFRandomModal();
+    });
 
     els("#cf-presets .preset-chip").forEach((chip)=>{
       chip.addEventListener("click", ()=>{
@@ -961,6 +1001,16 @@ function bindEvents(){
 
         const handle = (el("#cf-handle")?.value || "").trim();
         const excludeSolved = !!el("#cf-exclude-solved")?.checked;
+
+        // 勾选了排除AC => 强制校验 handle
+        if (excludeSolved) {
+          if (!handle) { alert("已勾选“排除已AC”，请填写 CF 账号"); return; }
+          const st = await validateCFHandle(handle);
+          if (!st.ok) {
+            alert(st.reason === "not_found" ? "CF 账号不存在，请检查" : "网络错误，稍后再试");
+            return;
+          }
+        }
 
         const ratingMin=ratingMinRaw?Number(ratingMinRaw):null;
         const ratingMax=ratingMaxRaw?Number(ratingMaxRaw):null;
