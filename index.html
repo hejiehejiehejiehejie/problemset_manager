@@ -13,9 +13,19 @@
     <aside class="sidebar">
       <div class="sidebar-header">
         <h1>题单</h1>
-        <button id="add-list-btn" title="新增题单">＋</button>
+
+        <div class="sidebar-right">
+          <div id="account-area" class="account account--sidebar">
+            <span id="account-email" class="email">未登录</span>
+            <button id="login-btn" title="登录">登录</button>
+            <button id="logout-btn" class="hidden" title="退出登录">退出</button>
+          </div>
+          <button id="add-list-btn" title="新增题单">＋</button>
+        </div>
       </div>
+
       <div id="lists"></div>
+
       <div class="sidebar-actions">
         <button id="export-btn">导出全部数据</button>
         <label class="import-label">
@@ -56,13 +66,6 @@
           <button id="sync-upload-btn" title="将本地数据上传到云端（覆盖云端）">上传云端</button>
           <button id="sync-download-btn" title="从云端下载数据（覆盖本地）">下载云端</button>
           <span id="sync-status" class="sync-status small"></span>
-
-          <!-- 账户区域 -->
-          <div id="account-area" class="account">
-            <span id="account-email" class="email">未登录</span>
-            <button id="login-btn" title="登录">登录</button>
-            <button id="logout-btn" class="hidden" title="退出登录">退出</button>
-          </div>
         </div>
       </div>
 

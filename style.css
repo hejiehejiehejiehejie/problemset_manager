@@ -70,6 +70,14 @@ html, body {
   letter-spacing: .3px;
 }
 
+/* 右侧容器：账户区 + 新建按钮 */
+.sidebar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .sidebar-header button {
   background: var(--accent-2);
   color: white;
@@ -592,7 +600,7 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 
-/* 账户区域 */
+/* 账户区域（默认） */
 .account {
   display: inline-flex;
   align-items: center;
@@ -606,6 +614,26 @@ input[type="number"]::-webkit-inner-spin-button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 侧栏标题内的账户区（紧凑版） */
+.account.account--sidebar {
+  margin: 0;
+  gap: 6px;
+}
+.account.account--sidebar #account-email {
+  max-width: 140px;
+}
+.account.account--sidebar #login-btn,
+.account.account--sidebar #logout-btn {
+  padding: 4px 10px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .account.account--sidebar #account-email { max-width: 100px; }
 }
 
 /* 同步状态文本 */
