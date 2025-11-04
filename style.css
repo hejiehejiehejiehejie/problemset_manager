@@ -712,3 +712,10 @@ input[type="number"]::-webkit-inner-spin-button {
   background: transparent;
   box-shadow: none;
 }
+/* Modal */
+.modal.hidden { display: none; }
+.modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: grid; place-items: center;
+  z-index: 2000; /* 原来是 1000，提高以压过侧栏(1200) */
+}

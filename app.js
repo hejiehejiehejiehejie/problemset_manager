@@ -1124,7 +1124,15 @@ function bindEvents(){
   const setMsg = (t, isErr=false) => { if (!msgEl) return; msgEl.textContent = t || ""; msgEl.style.color = isErr ? "var(--danger)" : "var(--muted)"; };
   const setSync = (t) => { if (syncStatus) syncStatus.textContent = t || ""; };
 
-  if (loginBtn) loginBtn.addEventListener("click", openAuthModal);
+  if (loginBtn) {
+    loginBtn.addEventListener("click", () => {
+      if (sidebar && sidebarBackdrop && window.innerWidth <= 900 && sidebar.classList.contains("open")) {
+        sidebar.classList.remove("open");
+        sidebarBackdrop.classList.remove("show");
+      }
+      openAuthModal();
+    });
+  }
   if (logoutBtn) logoutBtn.addEventListener("click", async () => { try { await supa?.auth?.signOut(); } catch {} });
 
   if (authClose) authClose.addEventListener("click", closeAuthModal);
