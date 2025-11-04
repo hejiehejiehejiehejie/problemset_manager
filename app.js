@@ -1,7 +1,6 @@
 /* 题单管理器（原始功能 + 窄屏工具栏里的展开按钮 + 无动画侧栏）
    增强：随机CF抽题支持
-   - 排除已AC（需填写 handle，含合法性校验）
-   - 若设置了分数上下限，则自动排除无rating的题目
+   现在：集成 Supabase 登录（GitHub/Google/邮箱密码）+ 手动上传/下载同步（不使用实时）
 */
 
 const STORAGE_KEY = "problem-lists:v1";
@@ -261,28 +260,101 @@ function addTagToProblem(problem, tag) {
 let state = loadState() || createDefaultState();
 saveState(state);
 
-/* 渲染：列表侧栏 */
-function renderLists() {
-  const wrap = el("#lists"); wrap.innerHTML = "";
-  state.lists.forEach((l) => {
-    const div = document.createElement("div");
-    div.className = "list-item" + (l.id === state.activeListId ? " active" : "");
-    div.dataset.listId = l.id;
-    div.innerHTML = `<div class="name">${escapeHtml(l.name || "未命名题单")}</div><div class="meta">${(l.problems||[]).length} 道题</div>`;
-    div.addEventListener("click", () => { state.activeListId = l.id; persist(); renderAll(); });
-    wrap.appendChild(div);
-  });
-  enableDragSort(wrap, ".list-item", (from, to) => {
-    const arr = state.lists.slice(); const [moved]=arr.splice(from,1); const insertAt=Math.max(0,Math.min(to,arr.length));
-    arr.splice(insertAt,0,moved); state.lists=arr; persist(); renderLists();
-  });
+/* Supabase 集成（登录 + 手动上传/下载） */
+const CLIENT_ID_KEY = "plm:client-id";
+function ensureClientId() {
+  try {
+    let id = localStorage.getItem(CLIENT_ID_KEY);
+    if (!id) { id = uid(); localStorage.setItem(CLIENT_ID_KEY, id); }
+    return id;
+  } catch { return uid(); }
 }
-function getActiveList() { return state.lists.find((l)=>l.id===state.activeListId) || state.lists[0] || null; }
-function renderToolbar() {
-  const list=getActiveList();
-  const input = el("#list-name-input");
-  if (input) input.value = list ? list.name : "";
+const CLIENT_ID = ensureClientId();
+
+const SUPA_CONF = (window.SUPABASE_CONFIG || null);
+let supa = null;      // Supabase 客户端
+let authUser = null;  // 当前登录用户
+const STATE_TABLE = "plm_states";
+
+/* 构造稳定的 OAuth 回跳地址（可在 supabase-config.js 用 redirectToOverride 强制指定） */
+function getRedirectTo() {
+  try {
+    const conf = window.SUPABASE_CONFIG || {};
+    if (conf.redirectToOverride) return conf.redirectToOverride;
+    const { origin, pathname } = window.location;
+    const path = pathname.replace(/\/index\.html$/, "/"); // 去掉末尾 index.html
+    return origin + path;
+  } catch {
+    return window.location.origin + "/";
+  }
 }
+
+function initSupabase() {
+  try {
+    if (!window.supabase || !SUPA_CONF || !SUPA_CONF.url || !SUPA_CONF.anonKey) { updateAccountUI(); return; }
+    supa = window.supabase.createClient(SUPA_CONF.url, SUPA_CONF.anonKey, {
+      auth: { persistSession: true, autoRefreshToken: true }
+    });
+    supa.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) onLogin(session.user);
+      updateAccountUI();
+    });
+    supa.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) onLogin(session.user); else onLogout();
+    });
+  } catch (e) { console.warn("Supabase init failed", e); updateAccountUI(); }
+}
+
+function updateAccountUI() {
+  const emailEl = el("#account-email");
+  const loginBtn = el("#login-btn");
+  const logoutBtn = el("#logout-btn");
+  const upBtn = el("#sync-upload-btn");
+  const downBtn = el("#sync-download-btn");
+  if (emailEl) emailEl.textContent = authUser ? (authUser.email || "已登录") : "未登录";
+  if (loginBtn) loginBtn.classList.toggle("hidden", !!authUser);
+  if (logoutBtn) logoutBtn.classList.toggle("hidden", !authUser);
+  // 登录前禁用同步按钮
+  const disabled = !authUser;
+  if (upBtn) upBtn.disabled = disabled;
+  if (downBtn) downBtn.disabled = disabled;
+}
+
+function onLogin(user) {
+  authUser = user;
+  updateAccountUI();
+}
+function onLogout() {
+  authUser = null;
+  updateAccountUI();
+}
+
+async function loadRemoteState() {
+  if (!supa || !authUser) return null;
+  const { data, error } = await supa.from(STATE_TABLE).select("data,updated_at").eq("user_id", authUser.id).single();
+  if (error && error.code !== "PGRST116") throw error; // 无行
+  return data?.data || null;
+}
+async function saveRemoteState() {
+  if (!supa || !authUser) return { ok: false, error: new Error("未登录") };
+  const payload = {
+    user_id: authUser.id,
+    data: { ...state, _meta: { client_id: CLIENT_ID, ts: Date.now() } },
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supa.from(STATE_TABLE).upsert(payload, { onConflict: "user_id" });
+  if (error) return { ok: false, error };
+  return { ok: true };
+}
+
+/* 登录弹窗控制 */
+function openAuthModal(){
+  const n=el("#auth-modal");
+  if(!n){ alert("登录模块未加载"); return; }
+  if(!supa){ alert("未配置 Supabase，无法登录。\n请在 supabase-config.js 中填写 anonKey。"); return; }
+  n.classList.remove("hidden");
+}
+function closeAuthModal(){ const n=el("#auth-modal"); if(n) n.classList.add("hidden"); }
 
 /* 单元格渲染：标题/难度/链接 */
 function renderTitleCell(p, cell) {
@@ -584,6 +656,7 @@ function button(text, cls = "") {
   return b;
 }
 function escapeHtml(s){ return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
+/* 修改：只本地保存（不再自动上传） */
 function persist(){ saveState(state); }
 
 /* 标签库管理面板 */
@@ -660,7 +733,7 @@ function renderTagManager(){
   });
 }
 
-/* 随机 CF 抽题 + 偏好记忆 + 限制 */
+/* 随机 CF 抽题 + 偏好记忆 + 限制（保持不变） */
 const CF_CACHE_KEY="cf:problemset:v1"; const CF_CACHE_TTL_MS=1000*60*60*24;
 
 const CF_PREF_KEYS = {
@@ -716,7 +789,7 @@ async function loadCFProblemset(force=false){
   const data={ problems: json.result.problems||[], ts: Date.now() }; localStorage.setItem(CF_CACHE_KEY, JSON.stringify(data)); return data;
 }
 
-/* 加载用户已AC集合（缓存12小时）；key 形如 contestId:index */
+/* AC 题过滤与 handle 校验（保持） */
 const CF_SOLVED_CACHE_TTL_MS = 1000 * 60 * 60 * 12;
 function cfSolvedCacheKey(handle){ return `cf:solved:${handle}`; }
 async function loadCFSolvedSet(handle) {
@@ -748,11 +821,9 @@ async function loadCFSolvedSet(handle) {
     return new Set();
   }
 }
-
-/* 账号合法性校验（缓存1小时） */
 async function validateCFHandle(handle) {
   const h = String(handle || "").trim();
-  if (!h) return { ok: true, reason: "empty" }; // 允许为空（仅在未勾选排除AC时）
+  if (!h) return { ok: true, reason: "empty" };
   try {
     const cacheKey = "cf:handle:valid:" + h.toLowerCase();
     const cached = localStorage.getItem(cacheKey);
@@ -770,12 +841,10 @@ async function validateCFHandle(handle) {
     return { ok: false, reason: "network" };
   }
 }
-
-/* 随机策略：支持 requireRated / excludeSolved */
 function pickRandomCF(problems, { ratingMin, ratingMax, tags, count, requireRated = false, excludeSolved = false, solvedSet = null }) {
   let pool=problems.filter((p)=>{
     const r=typeof p.rating==="number"?p.rating:null;
-    if (requireRated && r == null) return false;                 // 限分时排除无rating
+    if (requireRated && r == null) return false;
     if (ratingMin!=null && r!=null && r<ratingMin) return false;
     if (ratingMax!=null && r!=null && r>ratingMax) return false;
 
@@ -783,7 +852,7 @@ function pickRandomCF(problems, { ratingMin, ratingMax, tags, count, requireRate
 
     if (excludeSolved && solvedSet && solvedSet.size) {
       const key = `${p.contestId}:${String(p.index).toUpperCase()}`;
-      if (solvedSet.has(key)) return false;                      // 排除已AC
+      if (solvedSet.has(key)) return false;
     }
     return true;
   });
@@ -926,7 +995,7 @@ function bindEvents(){
     });
   }
 
-  /* 随机 CF 抽题：预设、竖向微调、记忆化、执行 + 限制 + 账号校验 */
+  /* 随机 CF 抽题：预设、记忆化等（保持） */
   const cfBtn=el("#cf-random-btn"), cfModal=el("#cf-random-modal");
   if (cfBtn && cfModal) {
     const cfCloseTop = el("#cf-random-close");
@@ -934,7 +1003,6 @@ function bindEvents(){
 
     cfBtn.addEventListener("click", () => {
       applyCFRandomPrefs();
-      // 弹窗打开后，给 handle 输入做防抖校验提示（若存在提示位）
       const handleEl = el("#cf-handle");
       const handleMsg = el("#cf-handle-msg");
       if (handleEl && handleMsg) {
@@ -946,7 +1014,6 @@ function bindEvents(){
         };
         const runCheck = async () => { const st = await validateCFHandle(handleEl.value); showMsg(st); };
         handleEl.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(runCheck, 350); }, { once: true });
-        // 初次打开不自动校验，只在首次输入或失焦时触发
         handleEl.addEventListener("blur", runCheck, { once: true });
       }
       openCFRandomModal();
@@ -1002,7 +1069,6 @@ function bindEvents(){
         const handle = (el("#cf-handle")?.value || "").trim();
         const excludeSolved = !!el("#cf-exclude-solved")?.checked;
 
-        // 勾选了排除AC => 强制校验 handle
         if (excludeSolved) {
           if (!handle) { alert("已勾选“排除已AC”，请填写 CF 账号"); return; }
           const st = await validateCFHandle(handle);
@@ -1014,7 +1080,7 @@ function bindEvents(){
 
         const ratingMin=ratingMinRaw?Number(ratingMinRaw):null;
         const ratingMax=ratingMaxRaw?Number(ratingMaxRaw):null;
-        const requireRated = (ratingMin!=null || ratingMax!=null); // 限分时排除无rating
+        const requireRated = (ratingMin!=null || ratingMax!=null);
         const tags=tagsRaw?tagsRaw.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean):[];
         const count=countRaw?Number(countRaw):1;
 
@@ -1029,10 +1095,8 @@ function bindEvents(){
         if (!picked.length) { alert("没有匹配的题目，请调整筛选条件"); return; }
 
         const items = picked.map(p => cfProblemToAppItem(p, includeTags));
-
         const existingUrls = new Set((list.problems||[]).map(x => (x.url||"").trim()));
         const deduped = items.filter(x => x.url && !existingUrls.has(x.url.trim()));
-
         if (!deduped.length) { alert("匹配题目已存在于当前题单，无新增"); return; }
 
         list.problems = [...deduped, ...(list.problems||[])];
@@ -1042,14 +1106,160 @@ function bindEvents(){
     });
   }
 
+  /* 登录 UI */
+  const loginBtn = el("#login-btn");
+  const logoutBtn = el("#logout-btn");
+  const authClose = el("#auth-close");
+  const authLogin = el("#auth-login");
+  const authSignup = el("#auth-signup");
+  const emailInput = el("#auth-email");
+  const passInput = el("#auth-password");
+  const msgEl = el("#auth-msg");
+  const oauthGithub = el("#oauth-github");
+  const oauthGoogle = el("#oauth-google");
+  const syncStatus = el("#sync-status");
+  const upBtn = el("#sync-upload-btn");
+  const downBtn = el("#sync-download-btn");
+
+  const setMsg = (t, isErr=false) => { if (!msgEl) return; msgEl.textContent = t || ""; msgEl.style.color = isErr ? "var(--danger)" : "var(--muted)"; };
+  const setSync = (t) => { if (syncStatus) syncStatus.textContent = t || ""; };
+
+  if (loginBtn) loginBtn.addEventListener("click", openAuthModal);
+  if (logoutBtn) logoutBtn.addEventListener("click", async () => { try { await supa?.auth?.signOut(); } catch {} });
+
+  if (authClose) authClose.addEventListener("click", closeAuthModal);
+
+  const doLogin = async () => {
+    try {
+      setMsg("登录中...");
+      const email = (emailInput?.value || "").trim();
+      const password = passInput?.value || "";
+      if (!email || !password) { setMsg("请输入邮箱和密码", true); return; }
+      const { error } = await supa.auth.signInWithPassword({ email, password });
+      if (error) { setMsg(error.message || "登录失败", true); return; }
+      setMsg(""); closeAuthModal();
+    } catch { setMsg("网络错误", true); }
+  };
+  const doSignup = async () => {
+    try {
+      setMsg("注册中...");
+      const email = (emailInput?.value || "").trim();
+      const password = passInput?.value || "";
+      if (!email || !password) { setMsg("请输入邮箱和密码", true); return; }
+      const { data, error } = await supa.auth.signUp({ email, password });
+      if (error) { setMsg(error.message || "注册失败", true); return; }
+      if (!data.session) setMsg("注册成功。若开启邮箱验证，请前往邮箱验证后再登录。");
+      else { setMsg(""); closeAuthModal(); }
+    } catch { setMsg("网络错误", true); }
+  };
+
+  if (authLogin) authLogin.addEventListener("click", doLogin);
+  if (authSignup) authSignup.addEventListener("click", doSignup);
+  if (passInput) passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+
+  // OAuth
+  const startOAuth = async (provider) => {
+    if (!supa) { alert("未配置 Supabase，无法登录。"); return; }
+    try {
+      const redirectTo = getRedirectTo();
+      setMsg(`跳转到 ${provider} 登录中...`);
+      await supa.auth.signInWithOAuth({ provider, options: { redirectTo } });
+    } catch (e) {
+      setMsg("第三方登录失败", true);
+      console.error(e);
+    }
+  };
+  if (oauthGithub) oauthGithub.addEventListener("click", () => startOAuth("github"));
+  if (oauthGoogle) oauthGoogle.addEventListener("click", () => startOAuth("google"));
+
+  // 手动同步：上传云端
+  if (upBtn) upBtn.addEventListener("click", async () => {
+    if (!supa || !authUser) { openAuthModal(); alert("请先登录账号，再执行上传。"); return; }
+    try {
+      upBtn.disabled = true; downBtn && (downBtn.disabled = true);
+      setSync("上传中...");
+      const { ok, error } = await saveRemoteState();
+      if (!ok) { console.error(error); setSync("上传失败"); alert("上传失败：" + (error?.message || "未知错误")); }
+      else { setSync("已上传"); setTimeout(()=>setSync(""), 1500); }
+    } finally {
+      upBtn.disabled = false; downBtn && (downBtn.disabled = !authUser);
+    }
+  });
+
+  // 手动同步：下载云端
+  if (downBtn) downBtn.addEventListener("click", async () => {
+    if (!supa || !authUser) { openAuthModal(); alert("请先登录账号，再执行下载。"); return; }
+    try {
+      upBtn && (upBtn.disabled = true); downBtn.disabled = true;
+      setSync("下载中...");
+      const remote = await loadRemoteState();
+      if (!remote) {
+        setSync("云端为空");
+        setTimeout(()=>setSync(""), 1500);
+        alert("云端暂无数据。可先在本设备点“上传云端”。");
+        return;
+      }
+      migrateState(remote);
+      state = remote;
+      saveState(state);
+      renderAll();
+      setSync("已下载");
+      setTimeout(()=>setSync(""), 1500);
+    } catch (e) {
+      console.error(e);
+      setSync("下载失败");
+      alert("下载失败：" + (e?.message || "未知错误"));
+    } finally {
+      upBtn && (upBtn.disabled = !authUser);
+      downBtn.disabled = !authUser;
+    }
+  });
+
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { closePopover(); closeTagsModal(); closeCFRandomModal(); }
+    if (e.key === "Escape") { closePopover(); closeTagsModal(); closeCFRandomModal(); closeAuthModal(); }
   });
 }
 
 function sanitizeFilename(s){ return String(s||"list").replace(/[\\/:*?"<>|]/g,"_").slice(0,60); }
 
+/* 渲染：列表侧栏与工具栏 */
+function renderLists() {
+  const wrap = el("#lists"); wrap.innerHTML = "";
+  state.lists.forEach((l) => {
+    const div = document.createElement("div");
+    div.className = "list-item" + (l.id === state.activeListId ? " active" : "");
+    div.dataset.listId = l.id;
+    div.innerHTML = `<div class="name">${escapeHtml(l.name || "未命名题单")}</div><div class="meta">${(l.problems||[]).length} 道题</div>`;
+    div.addEventListener("click", () => { state.activeListId = l.id; persist(); renderAll(); });
+    wrap.appendChild(div);
+  });
+  enableDragSort(wrap, ".list-item", (from, to) => {
+    const arr = state.lists.slice(); const [moved]=arr.splice(from,1); const insertAt=Math.max(0,Math.min(to,arr.length));
+    arr.splice(insertAt,0,moved); state.lists=arr; persist(); renderLists();
+  });
+}
+function getActiveList() { return state.lists.find((l)=>l.id===state.activeListId) || state.lists[0] || null; }
+function renderToolbar() {
+  const list=getActiveList();
+  const input = el("#list-name-input");
+  if (input) input.value = list ? list.name : "";
+}
+
 /* 初始化 */
 function renderAll(){ renderLists(); renderToolbar(); renderProblems(); }
-function init(){ bindEvents(); renderAll(); }
-document.addEventListener("DOMContentLoaded", init);
+
+function init(){
+  if (init.__ran) return;     // 防止重复执行
+  init.__ran = true;
+  bindEvents();
+  renderAll();
+  initSupabase();
+}
+
+// DOM 已就绪则立即运行，否则等 DOMContentLoaded
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
+

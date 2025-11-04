@@ -40,7 +40,7 @@
         </div>
 
         <div class="actions">
-          <!-- 移到工具栏的“展开题单”按钮（仅小屏显示），紧贴“新增题目”左侧 -->
+          <!-- 小屏展开侧栏按钮 -->
           <button id="sidebar-edge-open" class="edge-open-btn edge-inline" title="展开题单" aria-label="展开题单">▸</button>
 
           <button id="add-problem-btn">新增题目</button>
@@ -51,6 +51,18 @@
           </label>
           <button id="manage-tags-btn" title="管理标签库">标签库</button>
           <button id="cf-random-btn" title="随机抽取 Codeforces 题目">随机CF</button>
+
+          <!-- 手动同步 -->
+          <button id="sync-upload-btn" title="将本地数据上传到云端（覆盖云端）">上传云端</button>
+          <button id="sync-download-btn" title="从云端下载数据（覆盖本地）">下载云端</button>
+          <span id="sync-status" class="sync-status small"></span>
+
+          <!-- 账户区域 -->
+          <div id="account-area" class="account">
+            <span id="account-email" class="email">未登录</span>
+            <button id="login-btn" title="登录">登录</button>
+            <button id="logout-btn" class="hidden" title="退出登录">退出</button>
+          </div>
         </div>
       </div>
 
@@ -177,7 +189,47 @@
     </div>
   </div>
 
-  <script src="./app.js"></script>
+  <!-- 登录弹窗 -->
+  <div id="auth-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="auth-title">账号登录</h2>
+        <button id="auth-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="small" style="margin-bottom:8px; color: var(--muted);">选择登录方式</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+          <button id="oauth-github" class="btn-primary">使用 GitHub 登录</button>
+          <button id="oauth-google" class="btn-primary">使用 Google 登录</button>
+        </div>
+
+        <div class="small" style="margin:8px 0; color: var(--muted);">或使用邮箱密码</div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+          <div style="min-width:260px; flex:1;">
+            <div class="small">邮箱</div>
+            <input id="auth-email" class="input-sm" type="email" autocomplete="username" placeholder="you@example.com" />
+          </div>
+          <div style="min-width:220px; flex:1;">
+            <div class="small">密码</div>
+            <input id="auth-password" class="input-sm" type="password" autocomplete="current-password" placeholder="********" />
+          </div>
+        </div>
+        <div id="auth-msg" class="small" style="margin-top:8px; color: var(--muted);"></div>
+      </div>
+      <div class="modal-footer">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="auth-login" class="btn-primary">登录</button>
+          <button id="auth-signup">注册并登录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase 客户端与配置：加 defer，且一定在 app.js 之前 -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
+  <script defer src="./supabase-config.js"></script>
+  <script defer src="./app.js"></script>
+
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

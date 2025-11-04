@@ -1,4 +1,4 @@
-const CACHE_NAME = "plm-cache-v1"; // 修改版本号即可触发更新
+const CACHE_NAME = "plm-cache-v3"; // 修改版本号即可触发更新
 const ASSETS = [
   "./",
   "./index.html",
@@ -24,11 +24,13 @@ self.addEventListener("activate", (e) => {
   self.clients.claim(); // 立即接管已打开页面
 });
 
-// 网络优先，失败或离线则回退缓存
+// 仅缓存同源 GET；Supabase/CDN 等跨源请求直接走网络
 self.addEventListener("fetch", (e) => {
   const req = e.request;
-  // 仅缓存 GET
   if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== location.origin) return;
+
   e.respondWith(
     fetch(req)
       .then((resp) => {

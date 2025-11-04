@@ -38,6 +38,9 @@ html, body {
   font: 14px/1.5 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial;
 }
 
+/* 工具类 */
+.hidden { display: none !important; }
+
 #app {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -589,65 +592,25 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 
-/* 标签库：添加新标签按钮恢复为小号虚线按钮（未编辑态） */
-.lib-controls > button.btn-xxs {
-  background: transparent;
-  border: 1px dashed var(--border);
-  color: var(--muted);
-  border-radius: 6px;
-  height: 24px;
-  padding: 0 8px;
-}
-.lib-controls > button.btn-xxs:hover { border-color: var(--accent-2); color: var(--text); }
-/* 编辑态下的确定/取消按钮保持小胶囊风格 */
-.lib-controls input + .btn-primary.btn-xxs,
-.lib-controls input + .btn-primary.btn-xxs + .btn-xxs {
-  background: #21262d;
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 999px;
-  height: 24px;
-  padding: 2px 10px;
-}
-/* CF 抽题选项：与“写入题目标签”同款风格，左对齐 */
-.cf-options {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;         /* 窄屏自动换行，保持左对齐 */
-}
-
-.cf-opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-.cf-opt input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent-2);
-}
-
-.cf-handle {
+/* 账户区域 */
+.account {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  margin-left: 8px;
 }
-.cf-handle label {
+#account-email {
   color: var(--muted);
   font-size: 12px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cf-handle .input-sm {
-  width: 220px;
-  height: 30px;           /* 与其他 input-sm 对齐 */
-}
 
-/* 窄屏微调 */
-@media (max-width: 520px) {
-  .cf-handle .input-sm { width: 180px; }
+/* 同步状态文本 */
+.sync-status {
+  color: var(--muted);
+  font-size: 12px;
+  min-width: 80px;
 }
