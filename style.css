@@ -642,3 +642,73 @@ input[type="number"]::-webkit-inner-spin-button {
   font-size: 12px;
   min-width: 80px;
 }
+/* 登录/退出按钮（协调深色主题，轮廓+轻悬停底色） */
+#login-btn,
+#logout-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 4px 12px;
+  height: 28px;
+  font-size: 12px;
+  line-height: 1;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+}
+
+/* 登录：使用主色调轮廓 */
+#login-btn {
+  border-color: rgba(56,139,253,0.6);              /* var(--accent-2) 的半透明边框 */
+  color: #cfe5ff;                                   /* 略亮的蓝白 */
+}
+#login-btn:hover {
+  background: rgba(56,139,253,0.12);
+  border-color: var(--accent-2);
+  color: #e8f2ff;
+}
+#login-btn:active {
+  background: rgba(56,139,253,0.18);
+  transform: translateY(1px);
+}
+#login-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(56,139,253,0.25);
+}
+
+/* 退出：使用危险色调轮廓，但不过度刺眼 */
+#logout-btn {
+  border-color: rgba(248,81,73,0.6);               /* var(--danger) 的半透明边框 */
+  color: #ffd2cf;                                   /* 柔和的红系文字 */
+}
+#logout-btn:hover {
+  background: rgba(248,81,73,0.12);
+  border-color: var(--danger);
+  color: #ffe7e5;
+}
+#logout-btn:active {
+  background: rgba(248,81,73,0.18);
+  transform: translateY(1px);
+}
+#logout-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(248,81,73,0.25);
+}
+
+/* 小屏：更紧凑些 */
+@media (max-width: 900px) {
+  #login-btn,
+  #logout-btn {
+    padding: 3px 10px;
+    height: 26px;
+    font-size: 11.5px;
+  }
+}
+
+/* 禁用态（如果后续需要） */
+#login-btn:disabled,
+#logout-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: transparent;
+  box-shadow: none;
+}
