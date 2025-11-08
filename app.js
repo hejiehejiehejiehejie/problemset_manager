@@ -14,6 +14,10 @@ const dedup = (arr) => Array.from(new Set((arr || []).filter(Boolean)));
 const byNameAsc = (a, b) => String(a || "").localeCompare(String(b || ""));
 function normalizeTag(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
 
+// 图标：细线风格
+const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>';
+const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+
 /* 主题 */
 function getSystemTheme() {
   try { return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; }
@@ -26,8 +30,15 @@ function applyTheme(theme) {
   if (meta) meta.setAttribute("content", t === "light" ? "#ffffff" : "#161b22");
   const btn = el("#theme-toggle");
   if (btn) {
-    if (t === "light") { btn.textContent = "☀"; btn.title = "切换到深色模式"; }
-    else { btn.textContent = "☾"; btn.title = "切换到浅色模式"; }
+    if (t === "light") {
+      btn.innerHTML = ICON_SUN;
+      btn.title = "切换到深色模式";
+      btn.setAttribute("aria-label", "切换到深色模式");
+    } else {
+      btn.innerHTML = ICON_MOON;
+      btn.title = "切换到浅色模式";
+      btn.setAttribute("aria-label", "切换到浅色模式");
+    }
   }
 }
 function initTheme() {
@@ -340,9 +351,15 @@ function updateAccountUI() {
   const logoutBtn = el("#logout-btn");
   const upBtn = el("#sync-upload-btn");
   const downBtn = el("#sync-download-btn");
-  if (emailEl) emailEl.textContent = authUser ? (authUser.email || "已登录") : "未登录";
+
+  if (emailEl) {
+    emailEl.textContent = authUser ? (authUser.email || "已登录") : "未登录";
+    emailEl.classList.toggle("is-logged-in", !!authUser); // 登录后淡色小字
+  }
+
   if (loginBtn) loginBtn.classList.toggle("hidden", !!authUser);
   if (logoutBtn) logoutBtn.classList.toggle("hidden", !authUser);
+
   const disabled = !authUser;
   if (upBtn) upBtn.disabled = disabled;
   if (downBtn) downBtn.disabled = disabled;

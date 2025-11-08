@@ -180,6 +180,14 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .spin-mini[data-dir="down"]::before { content: ""; width: 0; height: 0; display: block; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid var(--muted); transition: border-top-color .15s ease; }
 .spin-mini[data-dir="down"]:hover::before { border-top-color: var(--text); }
 
+/* 主题按钮里的 SVG 图标尺寸与颜色 */
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  color: currentColor; /* stroke 使用 currentColor */
+}
+
 /* 细滚动条 */
 .scrollable, .popover, .modal-content, #lists, .table-wrap, .cat-body, .lib-cat-body, .actions { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -259,4 +267,9 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   [data-theme="light"] .problems-table tbody tr:nth-child(odd),
   [data-theme="light"] .problems-table tbody tr:nth-child(even) { background: var(--panel); }
   [data-theme="light"] .problems-table tbody tr:hover { background: #f0f3f6; }
+}
+/* 登录后：账号显示更淡更小 */
+#account-area .email.is-logged-in {
+  color: var(--muted);
+  font-size: 12px;
 }
