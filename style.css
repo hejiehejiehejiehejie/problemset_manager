@@ -17,6 +17,10 @@
   --scrollbar-thumb-hover: #4a5160;
 
   --sidebar-w: 280px;
+
+  /* 右键菜单宽度与内边距 */
+  --cm-width: 220px;   /* 右键菜单宽度 */
+  --cm-pad-x: 16px;    /* 菜单项左右内边距 */
 }
 
 * { box-sizing: border-box; }
@@ -51,7 +55,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
 #list-name-input { flex: 1 1 200px; min-width: 160px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
 .search { display: flex; gap: 8px; align-items: center; flex: 1 1 380px; min-width: 240px; }
 .search input { flex: 1; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
-.actions { display: flex; gap: 8px; align-items: center; flex: 1 1 100%; width: 100%; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; scrollbar-gutter: stable; }
+.actions { display: flex; gap: 12px; align-items: center; flex: 1 1 100%; width: 100%; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; scrollbar-gutter: stable; }
 .actions > * { flex: 0 0 auto; }
 .actions .import-label { display: inline-flex; align-items: center; background: #21262d; color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
 .actions .import-label:hover { border-color: var(--accent-2); }
@@ -87,10 +91,12 @@ button.danger { border-color: var(--danger); color: #ffd2cf; }
 /* 极简“更多”图标按钮 */
 .icon-btn { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: transparent; border: 1px solid var(--border); color: var(--muted); }
 .icon-btn:hover { color: var(--text); border-color: var(--accent-2); }
+.icon-btn svg { width: 16px; height: 16px; display: block; color: currentColor; }
+
 .hidden-actions { display: none; }
 
 /* Popover 与菜单（z-index 提升） */
-.popover { position: absolute; z-index: 1500; min-width: 200px; max-width: 320px; max-height: 360px; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); padding: 6px; scrollbar-gutter: stable both-edges; }
+.popover {position: absolute; z-index: 1500; min-width: 200px; max-width: 320px; max-height: 360px; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); padding: 6px; scrollbar-gutter: stable both-edges; }
 .menu { display: flex; flex-direction: column; gap: 4px; }
 .menu-item { display: block; width: 100%; text-align: left; background: transparent; color: var(--text); border: 1px solid transparent; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
 .menu-item:hover { background: #151a22; border-color: var(--border); }
@@ -180,14 +186,6 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .spin-mini[data-dir="down"]::before { content: ""; width: 0; height: 0; display: block; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid var(--muted); transition: border-top-color .15s ease; }
 .spin-mini[data-dir="down"]:hover::before { border-top-color: var(--text); }
 
-/* 主题按钮里的 SVG 图标尺寸与颜色 */
-.icon-btn svg {
-  width: 16px;
-  height: 16px;
-  display: block;
-  color: currentColor; /* stroke 使用 currentColor */
-}
-
 /* 细滚动条 */
 .scrollable, .popover, .modal-content, #lists, .table-wrap, .cat-body, .lib-cat-body, .actions { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -241,6 +239,9 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 #logout-btn:active { background: rgba(248,81,73,0.18); transform: translateY(1px); }
 #logout-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(248,81,73,0.25); }
 
+/* 登录后：账号显示更淡更小 */
+#account-area .email.is-logged-in { color: var(--muted); font-size: 12px; }
+
 /* 浅色：控件与细节修正 */
 [data-theme="light"] button { background: #f6f8fa; color: var(--text); border-color: var(--border); }
 [data-theme="light"] .actions .import-label { background: #f6f8fa; }
@@ -268,8 +269,128 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   [data-theme="light"] .problems-table tbody tr:nth-child(even) { background: var(--panel); }
   [data-theme="light"] .problems-table tbody tr:hover { background: #f0f3f6; }
 }
-/* 登录后：账号显示更淡更小 */
-#account-area .email.is-logged-in {
-  color: var(--muted);
-  font-size: 12px;
+
+/* 标签选择弹层分类折叠（补齐样式） */
+.cat-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:6px 8px; border-radius:8px; }
+.cat-head:hover { background:#151a22; }
+.cat-body { display:none; padding:6px 8px; }
+.cat-body.open { display:block; }
+
+/* 右键菜单：更舒展的比例与留白（不受全局 button 样式影响） */
+.popover.context-menu {
+  width: var(--cm-width);
+  max-width: none;
+  min-width: 0;
+  padding: 4px 4px;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+}
+.popover.context-menu .menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* 合并后的菜单项基础样式 */
+.popover.context-menu .menu-item {
+  background: transparent !important;
+  border: 0 !important;
+  width: 100%;
+  text-align: left;
+  padding: 10px var(--cm-pad-x);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.25;
+  color: var(--text);
+  white-space: nowrap;
+  transition: background-color .12s ease, color .12s ease;
+}
+.popover.context-menu .menu-item[disabled] {
+  opacity: .5; cursor: not-allowed;
+}
+.popover.context-menu .menu-divider {
+  margin: 4px 3px;
+  height: 1px;
+  background: var(--border);
+  border-radius: 1px;
+}
+.popover.context-menu .menu-item.danger { color: #ffd2cf; }
+.popover.context-menu .menu-item.danger:hover { background: rgba(248,81,73,0.12); }
+
+/* 右键菜单：仅颜色变化（适配深/浅色） */
+:root {
+  --cm-hover-bg: rgba(255, 255, 255, 0.08);
+  --cm-hover-fg: var(--text);
+}
+[data-theme="light"] {
+  --cm-hover-bg: rgba(0, 0, 0, 0.06);
+  --cm-hover-fg: var(--text);
+}
+
+/* 移除之前的装饰（若存在） */
+.popover.context-menu .menu-item::before { content: none !important; }
+
+/* 仅颜色变化：hover / 键盘聚焦 */
+.popover.context-menu .menu-item:hover,
+.popover.context-menu .menu-item:focus-visible {
+  outline: none;
+  background: var(--cm-hover-bg) !important;
+  color: var(--cm-hover-fg) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* 按下态保持同色（不做其它特效） */
+.popover.context-menu .menu-item:active {
+  background: var(--cm-hover-bg) !important;
+}
+
+/* 浅色主题：右键菜单危险项色调 */
+[data-theme="light"] .popover.context-menu .menu-item.danger { color: #b21d13; }
+[data-theme="light"] .popover.context-menu .menu-item.danger:hover { background: rgba(248,81,73,0.10); }
+/* 浅色模式：悬停高亮，仅桌面端生效 */
+@media (min-width: 761px) {
+  [data-theme="light"] .problems-table tbody tr:nth-child(odd),
+  [data-theme="light"] .problems-table tbody tr:nth-child(even) {
+    background: transparent;
+  }
+  [data-theme="light"] .problems-table tbody tr:hover {
+    background: #f0f3f6;
+  }
+}
+/* 仅增大容器的上下留白，不改左右与内部项 */
+.popover.context-menu {
+  padding-top: 10px;   /* 调大：如 20/24 都可以 */
+  padding-bottom: 10px;
+}
+
+/* 避免因留白增加而出现滚动条 */
+.popover:not(.context-menu) {
+  max-height: calc(360px + 32px); /* 原 360px + 上下各 16px 的留白 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: auto; /* 取消稳定沟槽，没溢出就不画滚动条 */
+}
+/* 缩窄右键菜单整体左右留白 */
+.popover.context-menu {
+  padding-left: 2px;   /* 容器左右 */
+  padding-right: 2px;
+  --cm-pad-x: 10px;    /* 菜单项左右（原来用的是 var(--cm-pad-x)） */
+}
+/* 紧凑标题栏：标签库 / 随机CF / 登录 / 高级筛选 */
+#tags-modal .modal-header,
+#cf-random-modal .modal-header,
+#auth-modal .modal-header,
+#filter-modal .modal-header {
+  padding: 6px 10px;   /* 原 10px 12px，缩小上下内边距 */
+  min-height: 0;       /* 防止最小高度撑高 */
+}
+
+/* 标题字号与行高更紧凑 */
+#tags-modal .modal-header h2,
+#cf-random-modal .modal-header h2,
+#auth-modal .modal-header h2,
+#filter-modal .modal-header h2 {
+  font-size: 19px;     /* 可改 15/13 按需 */
+  line-height: 1.2;
+  margin: 0;
 }

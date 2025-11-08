@@ -302,6 +302,21 @@ function addTagToProblem(problem, tag) {
 let state = loadState() || createDefaultState();
 saveState(state);
 
+/* 高级筛选（新增） */
+const filters = { diffMin: null, diffMax: null, tagsAll: [], tagsAny: [], sites: new Set() };
+function parseTagsInput(s) { return String(s || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean); }
+function getProblemNumericDifficulty(p) {
+  const d = Number(String(p.difficulty || "").trim());
+  return Number.isFinite(d) ? d : null;
+}
+function siteOfProblem(p) {
+  const u = String(p.url || "").toLowerCase();
+  if (/codeforces\.com/.test(u)) return "cf";
+  if (/atcoder\.jp/.test(u)) return "at";
+  if (/luogu\.com\.cn/.test(u)) return "luogu";
+  return "other";
+}
+
 /* Supabase 集成（登录 + 手动上传/下载） */
 const CLIENT_ID_KEY = "plm:client-id";
 function ensureClientId() {
@@ -488,12 +503,32 @@ function renderCodeLinkCell(p, cell) {
   showView();
 }
 
-/* 搜索匹配 */
+/* 搜索匹配（叠加高级筛选） */
 function matchQuery(p, q) {
-  if (!q) return true;
-  const s = q.trim().toLowerCase(); if (!s) return true;
-  const hay = [p.title||"", p.url||"", p.difficulty||"", p.codeUrl||"", ...(p.tags||[])].join(" ").toLowerCase();
-  return hay.includes(s);
+  if (q) {
+    const s = q.trim().toLowerCase(); if (s) {
+      const hay = [p.title||"", p.url||"", p.difficulty||"", p.codeUrl||"", ...(p.tags||[])].join(" ").toLowerCase();
+      if (!hay.includes(s)) return false;
+    }
+  }
+  // 高级筛选
+  const d = getProblemNumericDifficulty(p);
+  if (filters.diffMin != null && d != null && d < filters.diffMin) return false;
+  if (filters.diffMax != null && d != null && d > filters.diffMax) return false;
+  if (filters.tagsAll.length) {
+    const own = new Set((p.tags || []).map(t => String(t).toLowerCase()));
+    for (const t of filters.tagsAll) if (!own.has(t)) return false;
+  }
+  if (filters.tagsAny.length) {
+    const own = new Set((p.tags || []).map(t => String(t).toLowerCase()));
+    let ok = false; for (const t of filters.tagsAny) { if (own.has(t)) { ok = true; break; } }
+    if (!ok) return false;
+  }
+  if (filters.sites.size) {
+    const st = siteOfProblem(p);
+    if (!filters.sites.has(st)) return false;
+  }
+  return true;
 }
 
 /* Popover（共享） */
@@ -558,6 +593,96 @@ function togglePopover(anchorEl, builder) {
   });
 }
 
+/* 右键菜单（新增）：通用菜单 + 剪贴板 */
+const CLIPBOARD_KEY = "plm:clipboard:problems";
+function setClipboardProblems(problems) {
+  try {
+    const items = (problems || []).map(p => ({
+      title: p.title || "",
+      url: p.url || "",
+      difficulty: p.difficulty || "",
+      tags: Array.isArray(p.tags) ? [...p.tags] : [],
+      codeUrl: p.codeUrl || ""
+    }));
+    localStorage.setItem(CLIPBOARD_KEY, JSON.stringify({ type: "problems", ts: Date.now(), items }));
+    alert(`已复制 ${items.length} 个题目`);
+  } catch {}
+}
+function getClipboardProblems() {
+  try {
+    const raw = localStorage.getItem(CLIPBOARD_KEY);
+    if (!raw) return [];
+    const obj = JSON.parse(raw);
+    if (obj && obj.type === "problems" && Array.isArray(obj.items)) return obj.items;
+    return [];
+  } catch { return []; }
+}
+function hasClipboardProblems() { return getClipboardProblems().length > 0; }
+function pasteClipboardToList(list) {
+  if (!list) return;
+  const clip = getClipboardProblems();
+  if (!clip.length) { alert("剪贴板为空"); return; }
+  const existingUrls = new Set((list.problems || []).map(x => (x.url || "").trim()).filter(Boolean));
+  const news = clip
+    .map(p => ({ id: uid(), title: p.title || "", url: p.url || "", difficulty: p.difficulty || "", tags: Array.isArray(p.tags) ? [...p.tags] : [], codeUrl: p.codeUrl || "" }))
+    .filter(p => !p.url || !existingUrls.has(p.url.trim()));
+  if (!news.length) { alert("剪贴板题目已存在于当前题单，无新增"); return; }
+  list.problems = [...news, ...(list.problems || [])];
+  persist(); renderProblems(); alert(`已粘贴 ${news.length} 个题目`);
+}
+function buildSimpleMenu(items) {
+  const pop = document.createElement("div");
+  pop.className = "popover";
+  const menu = document.createElement("div");
+  menu.className = "menu";
+  for (const it of items) {
+    if (it.type === "divider") {
+      const hr = document.createElement("div"); hr.className = "menu-divider"; menu.appendChild(hr);
+      continue;
+    }
+    const btn = document.createElement("button");
+    btn.className = "menu-item";
+    btn.textContent = it.text;
+    if (it.disabled) btn.disabled = true;
+    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); try { it.onClick?.(); } finally { closePopover(); } });
+    menu.appendChild(btn);
+  }
+  pop.appendChild(menu);
+  return pop;
+}
+function openContextMenuAt(pageX, pageY, items) {
+  closePopover();
+  const pop = buildSimpleMenu(items);
+  pop.classList.add("context-menu"); // 仅右键菜单使用
+  document.body.appendChild(pop);
+
+  // 视口内定位 + 鼠标轻微偏移 + 四周留白
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const sx = window.scrollX, sy = window.scrollY;
+  const pad = 8;   // 距离视窗边缘
+  const ofs = 6;   // 鼠标偏移
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+
+  let left = pageX + ofs;
+  let top  = pageY + ofs;
+  if (left + w > sx + vw - pad) left = Math.max(sx + pad, sx + vw - w - pad);
+  if (top  + h > sy + vh - pad) top  = Math.max(sy + pad,  sy + vh - h - pad);
+
+  pop.style.position = "absolute";
+  pop.style.left = left + "px";
+  pop.style.top  = top  + "px";
+
+  currentPopover = pop;
+  currentPopoverAnchor = null;
+  setTimeout(() => {
+    document.addEventListener("click", outsideClickOnce, { capture: true });
+    window.addEventListener("resize", () => closePopover());
+    window.addEventListener("scroll", () => closePopover(), true);
+  });
+}
+
+
+
 /* 标签选择 popover */
 function buildTagPopover(problem, anchorEl, onChanged) {
   const pop=document.createElement("div"); pop.className="popover";
@@ -611,7 +736,19 @@ function renderProblems() {
   const list=getActiveList(); const tbody=el("#problems-tbody"); const q=el("#search-input").value;
   tbody.innerHTML=""; if (!list) return;
   const filtered=(list.problems||[]).filter((p)=>matchQuery(p,q));
-  if (!filtered.length) { const tr=document.createElement("tr"); tr.innerHTML = `<td colspan="6" style="color: var(--muted); padding: 18px;">没有匹配的题目</td>`; tbody.appendChild(tr); return; }
+  if (!filtered.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    const cols = (document.querySelector(".problems-table thead tr")?.children.length) || 6;
+    td.colSpan = cols;
+    td.textContent = "没有匹配的题目";
+    td.style.color = "var(--muted)";
+    td.style.padding = "24px";
+    td.style.textAlign = "center";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
   filtered.forEach((p)=>{
     const tr=el("#problem-row-tpl").content.firstElementChild.cloneNode(true);
     tr.classList.add("problem-row"); tr.dataset.pid=p.id;
@@ -622,6 +759,24 @@ function renderProblems() {
     el(".cell-tags", tr).setAttribute("data-label","标签");
     el(".cell-code", tr).setAttribute("data-label","代码链接");
     el(".cell-actions", tr).setAttribute("data-label","操作");
+
+    // 右键菜单（题目行）
+    tr.addEventListener("contextmenu", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const listRef = getActiveList();
+      const items = [
+        { text: "复制题目", onClick: () => setClipboardProblems([p]) },
+        { text: "粘贴到当前题单", disabled: !hasClipboardProblems(), onClick: () => pasteClipboardToList(listRef) },
+        { type: "divider" },
+        { text: "删除题目", onClick: () => {
+            if (!confirm(`确认删除题目「${p.title||"未命名"}」？`)) return;
+            const idx=listRef.problems.findIndex((x)=>x.id===p.id); if (idx>=0) listRef.problems.splice(idx,1);
+            persist(); renderAll();
+          }
+        }
+      ];
+      openContextMenuAt(e.pageX, e.pageY, items);
+    }, { passive: false });
 
     renderTitleCell(p, el(".cell-title", tr));
     renderProblemLinkCell(p, el(".cell-link", tr));
@@ -1118,107 +1273,87 @@ function bindEvents(){
     sidebarBackdrop.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); closeSidebar(); });
     window.addEventListener("resize", () => { if (window.innerWidth > 900) closeSidebar(); });
 
-    // 题目范围内（.table-wrap）右滑打开 / 左滑关闭（仅窄屏）
-    const contentArea = el(".table-wrap"); // 若想整个主区域可触发，可改为 el(".main")
-    if (contentArea) {
-      let startX = 0, startY = 0, startTs = 0, tracking = false, intent = null; // intent: "open" | "close"
+    // 左缘右划打开
+    let startX=0,startY=0,tracking=false; const EDGE=24, OPEN_THRESHOLD=56, MAX_ANGLE=28;
+    window.addEventListener("touchstart",(e)=>{
+      if(window.innerWidth>900) return;
+      if(sidebar.classList.contains("open")) return;
+      const t=e.touches[0];
+      if(t.clientX<=EDGE){ startX=t.clientX; startY=t.clientY; tracking=true; }
+    },{passive:true});
+    window.addEventListener("touchmove",(e)=>{
+      if(!tracking) return;
+      const t=e.touches[0];
+      const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY);
+      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
+      if(dx>0 && angle<MAX_ANGLE) e.preventDefault();
+    },{passive:false});
+    window.addEventListener("touchend",(e)=>{
+      if(!tracking) return;
+      tracking=false;
+      const t=e.changedTouches[0];
+      const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY);
+      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
+      if(dx>=OPEN_THRESHOLD && angle<MAX_ANGLE) openSidebar();
+    });
 
-      const OPEN_THRESHOLD = 50;     // 常规右滑打开距离
-      const CLOSE_THRESHOLD = 50;    // 常规左滑关闭距离
-      const FAST_PX = 120;           // 快速滑动距离
-      const FAST_MS = 250;           // 快速滑动时间阈值
-      const MAX_ANGLE = 28;          // 与水平夹角上限（越小越“更水平”）
+    // 打开后在侧栏内左划关闭
+    let closeStartX=0, closeStartY=0, closeTrack=false;
+    sidebar.addEventListener("touchstart",(e)=>{
+      if(window.innerWidth>900) return;
+      if(!sidebar.classList.contains("open")) return;
+      const t=e.touches[0];
+      closeStartX=t.clientX; closeStartY=t.clientY; closeTrack=true;
+    },{passive:true});
+    sidebar.addEventListener("touchmove",(e)=>{
+      if(!closeTrack) return;
+      const t=e.touches[0];
+      const dx=t.clientX-closeStartX, dy=Math.abs(t.clientY-closeStartY);
+      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
+      if(dx<0 && angle<MAX_ANGLE) e.preventDefault();
+    },{passive:false});
+    sidebar.addEventListener("touchend",(e)=>{
+      if(!closeTrack) return; closeTrack=false;
+      const t=e.changedTouches[0];
+      const dx=t.clientX-closeStartX, dy=Math.abs(t.clientY-closeStartY);
+      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
+      if(dx<=-OPEN_THRESHOLD && angle<MAX_ANGLE) closeSidebar();
+    });
 
-      const isNarrow = () => window.innerWidth <= 900;
-      const isInteractive = (target) =>
-        !!target.closest('input, textarea, select, button, a, [contenteditable="true"], .popover, .modal');
-
-      contentArea.addEventListener("touchstart", (e) => {
-        if (!isNarrow()) return;
-        if (isInteractive(e.target)) return;
-
-        const t = e.touches[0];
-        startX = t.clientX; startY = t.clientY; startTs = Date.now();
-        // 未打开 → 右滑打开；已打开 → 左滑关闭
-        intent = sidebar.classList.contains("open") ? "close" : "open";
-        tracking = true;
-      }, { passive: true });
-
-      contentArea.addEventListener("touchmove", (e) => {
-        if (!tracking) return;
-
-        const t = e.touches[0];
-        const dx = t.clientX - startX;
-        const dy = Math.abs(t.clientY - startY);
-        const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
-
-        // 水平方向时，阻止页面纵向滚动
-        if ((intent === "open" && dx > 0 && angle < MAX_ANGLE) ||
-            (intent === "close" && dx < 0 && angle < MAX_ANGLE)) {
-          e.preventDefault();
+    // 题目区域空白处右键：粘贴题目到当前题单
+    const tableWrap = el(".table-wrap");
+    if (tableWrap) {
+      tableWrap.addEventListener("contextmenu", (e) => {
+        // 跳过：已在题目行/弹层/交互控件上的右键，由各自处理
+        if (e.target.closest("tr.problem-row, .menu, .popover, input, textarea, select, button, a, [contenteditable]")) {
+          return;
         }
+        e.preventDefault();
+        e.stopPropagation();
+
+        const list = getActiveList();
+        if (!list) return;
+
+        const items = [
+          { text: "粘贴题目到当前题单", disabled: !hasClipboardProblems(), onClick: () => pasteClipboardToList(list) },
+        ];
+        openContextMenuAt(e.pageX, e.pageY, items); // 复用已有的右键菜单弹出
       }, { passive: false });
-
-      contentArea.addEventListener("touchend", (e) => {
-        if (!tracking) return;
-        tracking = false;
-
-        const t = e.changedTouches[0];
-        const dx = t.clientX - startX;
-        const dy = Math.abs(t.clientY - startY);
-        const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
-        const dt = Date.now() - startTs;
-
-        const normalOpen  = (dx >=  OPEN_THRESHOLD) && angle < MAX_ANGLE;
-        const fastOpen    = (dx >=  FAST_PX)       && (dt <= FAST_MS) && angle < MAX_ANGLE;
-        const normalClose = (dx <= -CLOSE_THRESHOLD) && angle < MAX_ANGLE;
-        const fastClose   = (dx <= -FAST_PX)         && (dt <= FAST_MS) && angle < MAX_ANGLE;
-
-        if (intent === "open" && !sidebar.classList.contains("open") && (normalOpen || fastOpen)) {
-          openSidebar();
-        } else if (intent === "close" && sidebar.classList.contains("open") && (normalClose || fastClose)) {
-          closeSidebar();
-        }
-      }, { passive: true });
     }
 
-    // 侧栏内左滑关闭（兜底；仅窄屏）
-    sidebar.addEventListener("touchstart", (e) => {
-      if (window.innerWidth > 900) return;
-      if (!sidebar.classList.contains("open")) return;
-      const t = e.touches[0];
-      sidebar.__sx = t.clientX;
-      sidebar.__sy = t.clientY;
-      sidebar.__ts = Date.now();
-      sidebar.__trk = true;
-    }, { passive: true });
+    // 全局右键：非操作区禁用浏览器自带菜单
+    document.addEventListener("contextmenu", (e) => {
+      const t = e.target;
 
-    sidebar.addEventListener("touchmove", (e) => {
-      if (!sidebar.__trk) return;
-      const t = e.touches[0];
-      const dx = t.clientX - sidebar.__sx;
-      const dy = Math.abs(t.clientY - sidebar.__sy);
-      const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
-      if (dx < 0 && angle < 28) e.preventDefault();
-    }, { passive: false });
+      // 允许的操作区：输入/编辑类，或显式标记了 .allow-browser-menu 的区域
+      const inAllowed =
+        t.closest('input, textarea, select, [contenteditable="true"], .allow-browser-menu');
 
-    sidebar.addEventListener("touchend", (e) => {
-      if (!sidebar.__trk) return;
-      sidebar.__trk = false;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - sidebar.__sx;
-      const dy = Math.abs(t.clientY - sidebar.__sy);
-      const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
-      const dt = Date.now() - sidebar.__ts;
+      if (inAllowed) return; // 放行浏览器菜单（复制/粘贴等）
 
-      const normalClose = (dx <= -50) && angle < 28;
-      const fastClose   = (dx <= -120) && (dt <= 250) && angle < 28;
-
-      if (sidebar.classList.contains("open") && (normalClose || fastClose)) {
-        closeSidebar();
-      }
-    }, { passive: true });
-
+      // 其他区域禁用浏览器菜单（使用我们自己的右键菜单逻辑）
+      e.preventDefault();
+    }, { capture: true });
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && window.innerWidth <= 900 && sidebar.classList.contains("open")) closeSidebar();
@@ -1410,6 +1545,43 @@ function bindEvents(){
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { closePopover(); closeTagsModal(); closeCFRandomModal(); closeAuthModal(); }
   });
+
+  // 高级筛选（按钮/面板）
+  el("#advanced-filter-btn")?.addEventListener("click", () => {
+    el("#f-diff-min").value = filters.diffMin ?? "";
+    el("#f-diff-max").value = filters.diffMax ?? "";
+    el("#f-tags-all").value = (filters.tagsAll || []).join(", ");
+    el("#f-tags-any").value = (filters.tagsAny || []).join(", ");
+    el("#f-site-cf").checked = filters.sites.has("cf");
+    el("#f-site-at").checked = filters.sites.has("at");
+    el("#f-site-luogu").checked = filters.sites.has("luogu");
+    el("#f-site-other").checked = filters.sites.has("other");
+    el("#filter-modal").classList.remove("hidden");
+  });
+  el("#filter-close")?.addEventListener("click", () => el("#filter-modal").classList.add("hidden"));
+  el("#filter-reset")?.addEventListener("click", () => {
+    filters.diffMin = null; filters.diffMax = null;
+    filters.tagsAll = []; filters.tagsAny = [];
+    filters.sites = new Set();
+    el("#filter-modal").classList.add("hidden");
+    renderProblems();
+  });
+  el("#filter-apply")?.addEventListener("click", () => {
+    const minRaw = el("#f-diff-min").value.trim();
+    const maxRaw = el("#f-diff-max").value.trim();
+    filters.diffMin = (minRaw === "") ? null : (Number.isFinite(Number(minRaw)) ? Number(minRaw) : null);
+    filters.diffMax = (maxRaw === "") ? null : (Number.isFinite(Number(maxRaw)) ? Number(maxRaw) : null);
+    filters.tagsAll = parseTagsInput(el("#f-tags-all").value);
+    filters.tagsAny = parseTagsInput(el("#f-tags-any").value);
+    const s = new Set();
+    if (el("#f-site-cf").checked) s.add("cf");
+    if (el("#f-site-at").checked) s.add("at");
+    if (el("#f-site-luogu").checked) s.add("luogu");
+    if (el("#f-site-other").checked) s.add("other");
+    filters.sites = s;
+    el("#filter-modal").classList.add("hidden");
+    renderProblems();
+  });
 }
 
 /* 侧栏可拖拽调宽 */
@@ -1467,7 +1639,29 @@ function renderLists() {
     div.className = "list-item" + (l.id === state.activeListId ? " active" : "");
     div.dataset.listId = l.id;
     div.innerHTML = `<div class="name">${escapeHtml(l.name || "未命名题单")}</div><div class="meta">${(l.problems||[]).length} 道题</div>`;
+
+    // 左键切换题单
     div.addEventListener("click", () => { state.activeListId = l.id; persist(); renderAll(); });
+    // 右键菜单（题单）
+    div.addEventListener("contextmenu", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const listObj = state.lists.find(x => x.id === l.id);
+      const items = [
+        { text: "复制此题单的题目", onClick: () => setClipboardProblems(listObj?.problems || []) },
+        { text: "粘贴题目到此题单", disabled: !hasClipboardProblems(), onClick: () => pasteClipboardToList(listObj) },
+        { type: "divider" },
+        { text: "删除题单", onClick: () => {
+            if (!confirm(`确认删除题单「${l.name || "未命名题单"}」及其全部题目？`)) return;
+            state.lists = state.lists.filter(x => x.id !== l.id);
+            if (!state.lists.length) state = createDefaultState();
+            if (state.activeListId === l.id) state.activeListId = state.lists[0]?.id || null;
+            persist(); renderAll();
+          }
+        }
+      ];
+      openContextMenuAt(e.pageX, e.pageY, items);
+    }, { passive: false });
+
     wrap.appendChild(div);
   });
   enableDragSort(wrap, ".list-item", (from, to) => {
