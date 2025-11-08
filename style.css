@@ -394,3 +394,20 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   line-height: 1.2;
   margin: 0;
 }
+/* 窄屏下让“没有匹配的题目”这类跨列单元格真正居中显示 */
+@media (max-width: 760px) {
+  .problems-table tbody tr td[colspan] {
+    display: block !important;          /* 覆盖窄屏将 td 设为 flex 的规则 */
+    width: 100% !important;
+    padding: 24px !important;           /* 保留原内边距 */
+    text-align: center !important;      /* 文本居中 */
+    justify-content: initial !important;/* 清理 flex 影响（兜底） */
+    align-items: initial !important;
+    gap: 0 !important;
+    white-space: normal !important;
+  }
+  .problems-table tbody tr td[colspan]::before {
+    content: none !important;           /* 去掉左侧伪标签占位 */
+    display: none !important;
+  }
+}
