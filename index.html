@@ -10,43 +10,40 @@
 </head>
 <body>
   <div id="app">
-    <aside class="sidebar">
+    <aside class="sidebar" aria-label="题单侧栏">
       <div class="sidebar-header">
         <h1>题单</h1>
-
         <div class="sidebar-right">
-          <div id="account-area" class="account account--sidebar">
+          <div id="account-area" class="account account--sidebar" aria-live="polite">
             <span id="account-email" class="email">未登录</span>
             <button id="login-btn" title="登录">登录</button>
             <button id="logout-btn" class="hidden" title="退出登录">退出</button>
           </div>
-          <button id="add-list-btn" title="新增题单">＋</button>
+          <button id="add-list-btn" title="新增题单" aria-label="新增题单">＋</button>
         </div>
       </div>
 
-      <div id="lists"></div>
+      <nav id="lists" aria-label="题单列表"></nav>
 
-      <div class="sidebar-actions">
-        <button id="export-btn">导出全部数据</button>
-        <label class="import-label">
-          导入全部数据
-          <input id="import-input" type="file" accept="application/json" />
-        </label>
-      </div>
+      <!-- 底部分隔线（不放按钮了） -->
+      <div class="sidebar-actions"></div>
+
+      <!-- 宽屏拖拽柄：拖动可调整侧栏宽度 -->
+      <div id="sidebar-resizer" class="sidebar-resizer" title="拖动调整侧栏宽度" aria-hidden="true"></div>
     </aside>
 
-    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+    <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
 
-    <main class="main">
+    <main class="main" role="main">
       <div class="toolbar">
         <div class="current-list">
-          <input id="list-name-input" placeholder="未命名题单" />
+          <input id="list-name-input" placeholder="未命名题单" aria-label="题单名称" />
           <button id="rename-list-btn" title="重命名">重命名</button>
           <button id="delete-list-btn" class="danger" title="删除题单">删除</button>
         </div>
 
         <div class="search">
-          <input id="search-input" placeholder="搜索：标题 / 链接 / 难度 / 标签" />
+          <input id="search-input" placeholder="搜索：标题 / 链接 / 难度 / 标签" aria-label="搜索题目" />
         </div>
 
         <div class="actions">
@@ -54,21 +51,37 @@
           <button id="sidebar-edge-open" class="edge-open-btn edge-inline" title="展开题单" aria-label="展开题单">▸</button>
 
           <button id="add-problem-btn">新增题目</button>
-          <button id="export-list-btn" title="导出当前题单">导出题单</button>
-          <label class="import-label" title="导入单个题单">
-            导入题单
-            <input id="import-list-input" type="file" accept="application/json" />
-          </label>
-          <button id="manage-tags-btn" title="管理标签库">标签库</button>
           <button id="cf-random-btn" title="随机抽取 Codeforces 题目">随机CF</button>
 
-          <!-- 手动同步 -->
-          <button id="sync-upload-btn" title="将本地数据上传到云端（覆盖云端）">上传云端</button>
-          <button id="sync-download-btn" title="从云端下载数据（覆盖本地）">下载云端</button>
+          <!-- 从这里开始整体推到最右边 -->
+          <span id="sync-status" class="sync-status" aria-live="polite" style="margin-left:auto;"></span>
+          <button id="theme-toggle" class="icon-btn" title="切换主题" aria-label="切换主题">☾</button>
+          <button id="toolbar-more-btn" class="icon-btn" title="更多" aria-label="更多">⋯</button>
+          <!-- 隐藏的原控件：菜单项通过它们触发（保持 app.js 逻辑） -->
+          <div class="hidden-actions">
+            <!-- 题单级 -->
+            <button id="export-list-btn" title="导出当前题单">导出题单</button>
+            <label class="import-label" title="导入单个题单">
+              导入题单
+              <input id="import-list-input" type="file" accept="application/json" />
+            </label>
+            <button id="manage-tags-btn" title="管理标签库">标签库</button>
+
+            <!-- 同步 -->
+            <button id="sync-upload-btn" title="将本地数据上传到云端（覆盖云端）">上传云端</button>
+            <button id="sync-download-btn" title="从云端下载数据（覆盖本地）">下载云端</button>
+
+            <!-- 全部数据（从侧栏合并过来） -->
+            <button id="export-btn">导出全部数据</button>
+            <label class="import-label">
+              导入全部数据
+              <input id="import-input" type="file" accept="application/json" />
+            </label>
+          </div>
         </div>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap" aria-live="polite">
         <table class="problems-table">
           <thead>
             <tr>
@@ -102,11 +115,11 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="tags-modal-title">标签库管理</h2>
-        <button id="tags-modal-close">✕</button>
+        <button id="tags-modal-close" aria-label="关闭">✕</button>
       </div>
       <div class="modal-body">
         <div class="taglib-toolbar">
-          <input id="new-cat-input" class="input-sm" placeholder="新建分类名称后回车" />
+          <input id="new-cat-input" class="input-sm" placeholder="新建分类名称后回车" aria-label="新建标签分类" />
         </div>
         <div id="taglib-cats"></div>
       </div>
@@ -118,7 +131,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="cf-random-title">随机抽取 Codeforces 题目</h2>
-        <button id="cf-random-close">✕</button>
+        <button id="cf-random-close" aria-label="关闭">✕</button>
       </div>
       <div class="modal-body">
         <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
@@ -181,6 +194,7 @@
             <div class="cf-handle">
               <label for="cf-handle">CF 账号</label>
               <input id="cf-handle" class="input-sm" placeholder="如 tourist（可留空）" />
+              <div id="cf-handle-msg" class="small" style="margin-top:4px; color: var(--muted);"></div>
             </div>
           </div>
         </div>
@@ -196,7 +210,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="auth-title">账号登录</h2>
-        <button id="auth-close">✕</button>
+        <button id="auth-close" aria-label="关闭">✕</button>
       </div>
       <div class="modal-body">
         <div class="small" style="margin-bottom:8px; color: var(--muted);">选择登录方式</div>

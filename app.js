@@ -1,10 +1,8 @@
-/* 题单管理器（原始功能 + 窄屏工具栏里的展开按钮 + 无动画侧栏）
-   增强：随机CF抽题支持
-   现在：集成 Supabase 登录（GitHub/Google/邮箱密码）+ 手动上传/下载同步（不使用实时）
-*/
+/* 题单管理器（宽屏侧栏可拖动调宽，窄屏抽屉；工具栏“更多”菜单；随机CF/标签库/Supabase/导入导出） */
 
 const STORAGE_KEY = "problem-lists:v1";
 const UNCATEGORIZED_NAME = "未分类";
+const SIDEBAR_W_KEY = "plm:sidebar-w"; // 本地存储侧栏宽度
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const el = (sel, root = document) => root.querySelector(sel);
@@ -70,7 +68,44 @@ function trySetTitleFromUrl(problem) {
   return false;
 }
 
-/* 拖拽（带自动滚动 + 兜底提交） */
+/* 主题切换 */
+const THEME_KEY = "plm:theme"; // "light" | "dark"
+
+function getSystemTheme() {
+  try { return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; }
+  catch { return "dark"; }
+}
+function applyTheme(theme) {
+  const t = (theme === "light" || theme === "dark") ? theme : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+  // 更新 PWA 主题色（移动端地址栏等）
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", t === "light" ? "#ffffff" : "#161b22");
+  // 更新按钮图标与提示
+  const btn = el("#theme-toggle");
+  if (btn) {
+    if (t === "light") { btn.textContent = "☀"; btn.title = "切换到深色模式"; }
+    else { btn.textContent = "☾"; btn.title = "切换到浅色模式"; }
+  }
+}
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch {}
+  const initial = saved || getSystemTheme();   // 没有保存时跟随系统
+  applyTheme(initial);
+  const btn = el("#theme-toggle");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      const cur = document.documentElement.getAttribute("data-theme") || "dark";
+      const next = (cur === "light") ? "dark" : "light";
+      applyTheme(next);
+      try { localStorage.setItem(THEME_KEY, next); } catch {}
+    });
+  }
+}
+
+
+/* 拖拽重排（带自动滚动） */
 function enableDragSort(container, itemSelector, onReorder) {
   if (container.__dndCleanup) container.__dndCleanup();
   container.querySelectorAll(".drag-placeholder").forEach((n) => n.remove());
@@ -186,7 +221,7 @@ function createDefaultState() {
   ensureTagLibrary(st); return st;
 }
 
-/* 标签库操作（同原版） */
+/* 标签库操作（略：与前一致） */
 function getCategories() { return state.tagLibrary.categories; }
 function findCatById(id) { return getCategories().find((c) => c.id === id); }
 function findOrCreateUncategorized() {
@@ -272,17 +307,17 @@ function ensureClientId() {
 const CLIENT_ID = ensureClientId();
 
 const SUPA_CONF = (window.SUPABASE_CONFIG || null);
-let supa = null;      // Supabase 客户端
-let authUser = null;  // 当前登录用户
+let supa = null;
+let authUser = null;
 const STATE_TABLE = "plm_states";
 
-/* 构造稳定的 OAuth 回跳地址（可在 supabase-config.js 用 redirectToOverride 强制指定） */
+/* OAuth 回跳 */
 function getRedirectTo() {
   try {
     const conf = window.SUPABASE_CONFIG || {};
     if (conf.redirectToOverride) return conf.redirectToOverride;
     const { origin, pathname } = window.location;
-    const path = pathname.replace(/\/index\.html$/, "/"); // 去掉末尾 index.html
+    const path = pathname.replace(/\/index\.html$/, "/");
     return origin + path;
   } catch {
     return window.location.origin + "/";
@@ -314,25 +349,17 @@ function updateAccountUI() {
   if (emailEl) emailEl.textContent = authUser ? (authUser.email || "已登录") : "未登录";
   if (loginBtn) loginBtn.classList.toggle("hidden", !!authUser);
   if (logoutBtn) logoutBtn.classList.toggle("hidden", !authUser);
-  // 登录前禁用同步按钮
   const disabled = !authUser;
   if (upBtn) upBtn.disabled = disabled;
   if (downBtn) downBtn.disabled = disabled;
 }
-
-function onLogin(user) {
-  authUser = user;
-  updateAccountUI();
-}
-function onLogout() {
-  authUser = null;
-  updateAccountUI();
-}
+function onLogin(user) { authUser = user; updateAccountUI(); }
+function onLogout() { authUser = null; updateAccountUI(); }
 
 async function loadRemoteState() {
   if (!supa || !authUser) return null;
   const { data, error } = await supa.from(STATE_TABLE).select("data,updated_at").eq("user_id", authUser.id).single();
-  if (error && error.code !== "PGRST116") throw error; // 无行
+  if (error && error.code !== "PGRST116") throw error;
   return data?.data || null;
 }
 async function saveRemoteState() {
@@ -347,16 +374,7 @@ async function saveRemoteState() {
   return { ok: true };
 }
 
-/* 登录弹窗控制 */
-function openAuthModal(){
-  const n=el("#auth-modal");
-  if(!n){ alert("登录模块未加载"); return; }
-  if(!supa){ alert("未配置 Supabase，无法登录。\n请在 supabase-config.js 中填写 anonKey。"); return; }
-  n.classList.remove("hidden");
-}
-function closeAuthModal(){ const n=el("#auth-modal"); if(n) n.classList.add("hidden"); }
-
-/* 单元格渲染：标题/难度/链接 */
+/* 单元格渲染：标题/难度/链接/代码 */
 function renderTitleCell(p, cell) {
   cell.setAttribute("data-label","标题");
   cell.innerHTML = "";
@@ -467,7 +485,7 @@ function matchQuery(p, q) {
   return hay.includes(s);
 }
 
-/* 标签选择 popover（原版） */
+/* Popover（菜单与标签选择共用） */
 let currentPopover = null;
 let currentPopoverAnchor = null;
 let __popRaf = 0;
@@ -480,7 +498,7 @@ function closePopover() {
   currentPopover.remove(); currentPopover = null;
   currentPopoverAnchor = null;
 }
-function outsideClickOnce(e){ if(currentPopover && !currentPopover.contains(e.target)) closePopover(); }
+function outsideClickOnce(e){ if(currentPopover && !currentPopover.contains(e.target) && e.target !== currentPopoverAnchor) closePopover(); }
 function positionPopover(pop, anchorEl) {
   const rect=anchorEl.getBoundingClientRect();
   let top=rect.bottom+window.scrollY+6;
@@ -515,6 +533,10 @@ function onWindowResize(){
   positionPopover(currentPopover, currentPopoverAnchor);
 }
 function togglePopover(anchorEl, builder) {
+  if (currentPopover && currentPopoverAnchor === anchorEl) { // 再次点击同一锚点：收起
+    closePopover();
+    return;
+  }
   if (currentPopover) closePopover();
   const pop = builder();
   document.body.appendChild(pop);
@@ -574,7 +596,7 @@ function buildTagPopover(problem, anchorEl, onChanged) {
   pop.appendChild(s2); return pop;
 }
 
-/* 渲染题目表 */
+/* 渲染题目表（略同前） */
 function renderProblems() {
   const list=getActiveList(); const tbody=el("#problems-tbody"); const q=el("#search-input").value;
   tbody.innerHTML=""; if (!list) return;
@@ -647,19 +669,13 @@ function renderProblems() {
   }
 }
 
-/* DOM 工具 */
+/* DOM 小工具 */
 function input(type, value="", placeholder=""){ const i=document.createElement("input"); i.type=type; i.value=value||""; i.placeholder=placeholder; return i; }
-function button(text, cls = "") {
-  const b = document.createElement("button");
-  b.textContent = text;
-  if (cls) cls.split(/\s+/).filter(Boolean).forEach(c => b.classList.add(c));
-  return b;
-}
-function escapeHtml(s){ return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
-/* 修改：只本地保存（不再自动上传） */
+function button(text, cls = "") { const b = document.createElement("button"); b.textContent = text; if (cls) cls.split(/\s+/).filter(Boolean).forEach(c => b.classList.add(c)); return b; }
+function escapeHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function persist(){ saveState(state); }
 
-/* 标签库管理面板 */
+/* 标签库管理（略同前） */
 function openTagsModal(){ el("#tags-modal").classList.remove("hidden"); renderTagManager(); }
 function closeTagsModal(){ el("#tags-modal").classList.add("hidden"); }
 function renderTagManager(){
@@ -733,9 +749,8 @@ function renderTagManager(){
   });
 }
 
-/* 随机 CF 抽题 + 偏好记忆 + 限制（保持不变） */
+/* 随机 CF 抽题（略：与前一致） */
 const CF_CACHE_KEY="cf:problemset:v1"; const CF_CACHE_TTL_MS=1000*60*60*24;
-
 const CF_PREF_KEYS = {
   includeTags: "cf:random:includeTags",
   ratingMin: "cf:random:ratingMin",
@@ -779,7 +794,6 @@ function saveCFRandomPrefsFromForm() {
   if (handleEl) setPref(CF_PREF_KEYS.handle, handleEl.value.trim());
   if (exSolvedEl) setPref(CF_PREF_KEYS.excludeSolved, exSolvedEl.checked ? "1" : "0");
 }
-
 async function loadCFProblemset(force=false){
   try { const raw=localStorage.getItem(CF_CACHE_KEY);
     if (!force && raw) { const data=JSON.parse(raw); if (data && Array.isArray(data.problems) && Date.now()-(data.ts||0)<CF_CACHE_TTL_MS) return data; }
@@ -788,8 +802,6 @@ async function loadCFProblemset(force=false){
   const json=await resp.json(); if (json.status!=="OK") throw new Error("CF API 错误");
   const data={ problems: json.result.problems||[], ts: Date.now() }; localStorage.setItem(CF_CACHE_KEY, JSON.stringify(data)); return data;
 }
-
-/* AC 题过滤与 handle 校验（保持） */
 const CF_SOLVED_CACHE_TTL_MS = 1000 * 60 * 60 * 12;
 function cfSolvedCacheKey(handle){ return `cf:solved:${handle}`; }
 async function loadCFSolvedSet(handle) {
@@ -870,6 +882,118 @@ function cfProblemToAppItem(p, includeTags=true){
 function openCFRandomModal(){ el("#cf-random-modal").classList.remove("hidden"); }
 function closeCFRandomModal(){ el("#cf-random-modal").classList.add("hidden"); }
 
+/* 工具栏“更多”菜单 */
+function initMoreMenu() {
+  const $ = (s, r=document) => r.querySelector(s);
+  const clickSel = (s) => { const n = $(s); if (n) n.click(); };
+
+  function buildMenu(items) {
+    const pop = document.createElement("div");
+    pop.className = "popover";
+    const menu = document.createElement("div");
+    menu.className = "menu";
+    for (const it of items) {
+      if (it.type === "divider") {
+        const hr = document.createElement("div"); hr.className = "menu-divider"; menu.appendChild(hr);
+        continue;
+      }
+      const btn = document.createElement("button");
+      btn.className = "menu-item";
+      btn.textContent = it.text;
+      if (it.disabled) btn.disabled = true;
+      btn.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        try { it.onClick?.(); } finally { closePopover(); }
+      });
+      menu.appendChild(btn);
+    }
+    pop.appendChild(menu);
+    return pop;
+  }
+
+  const toolbarMore = el("#toolbar-more-btn");
+  if (toolbarMore) {
+    toolbarMore.addEventListener("click", (e) => {
+      e.preventDefault();
+      const upBtn = el("#sync-upload-btn");
+      const downBtn = el("#sync-download-btn");
+      const items = [
+        { text: "标签库", onClick: () => clickSel("#manage-tags-btn") },
+        { text: "导出题单", onClick: () => clickSel("#export-list-btn") },
+        { text: "导入题单", onClick: () => clickSel("#import-list-input") },
+        { type: "divider" },
+        { text: "上传云端", onClick: () => clickSel("#sync-upload-btn"), disabled: !!(upBtn && upBtn.disabled) },
+        { text: "下载云端", onClick: () => clickSel("#sync-download-btn"), disabled: !!(downBtn && downBtn.disabled) },
+        { type: "divider" },
+        { text: "导出全部数据", onClick: () => clickSel("#export-btn") },
+        { text: "导入全部数据", onClick: () => clickSel("#import-input") },
+      ];
+      togglePopover(toolbarMore, () => buildMenu(items));
+    });
+  }
+}
+
+/* 宽屏：侧栏可拖拽调整宽度 */
+function setupSidebarResizer() {
+  const handle = el("#sidebar-resizer");
+  const sidebar = el(".sidebar");
+  if (!handle || !sidebar) return;
+
+  const MIN_W = 240; // 与 CSS min-width 保持一致
+  const getMaxW = () => Math.max(MIN_W, Math.min(600, Math.floor(window.innerWidth * 0.6)));
+
+  // 应用/保存宽度
+  const applyW = (w) => document.documentElement.style.setProperty("--sidebar-w", `${w}px`);
+  const saveW = (w) => { try { localStorage.setItem(SIDEBAR_W_KEY, String(w)); } catch {} };
+  const getCurrentW = () => {
+    const v = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sidebar-w"), 10);
+    return Number.isFinite(v) ? v : Math.round(sidebar.getBoundingClientRect().width);
+  };
+  const clampW = (w) => Math.max(MIN_W, Math.min(getMaxW(), w));
+
+  // 初始化：读取本地配置
+  try {
+    const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || "", 10);
+    if (Number.isFinite(saved)) applyW(clampW(saved));
+  } catch {}
+
+  let active = false, startX = 0, startW = 0;
+
+  const onMove = (e) => {
+    if (!active) return;
+    const dx = e.clientX - startX;
+    const w = clampW(startW + dx);
+    applyW(w);
+  };
+  const onUp = () => {
+    if (!active) return;
+    active = false;
+    document.body.classList.remove("resizing");
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    const w = getCurrentW();
+    saveW(clampW(w));
+  };
+
+  handle.addEventListener("pointerdown", (e) => {
+    if (window.innerWidth <= 900) return; // 窄屏不处理
+    e.preventDefault();
+    active = true;
+    startX = e.clientX;
+    startW = sidebar.getBoundingClientRect().width;
+    document.body.classList.add("resizing");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  });
+
+  // 窗口变化时保持限制
+  window.addEventListener("resize", () => {
+    if (window.innerWidth <= 900) return;
+    const w = clampW(getCurrentW());
+    applyW(w); saveW(w);
+  });
+}
+
 /* 事件绑定 */
 function bindEvents(){
   el("#add-list-btn").addEventListener("click", ()=>{
@@ -898,14 +1022,7 @@ function bindEvents(){
     if(!state.lists.length) state=createDefaultState(); persist(); renderAll();
   });
 
-  const searchInput = el("#search-input");
-  const clearBtn = el("#clear-search-btn");
-  if (searchInput) {
-    const toggleClear = () => { if (clearBtn) clearBtn.style.display = searchInput.value ? "inline-flex" : "none"; };
-    searchInput.addEventListener("input", ()=>{ renderProblems(); toggleClear(); });
-    toggleClear();
-  }
-  if (clearBtn) clearBtn.addEventListener("click", ()=>{ el("#search-input").value=""; clearBtn.style.display="none"; renderProblems(); });
+  el("#search-input")?.addEventListener("input", ()=>{ renderProblems(); });
 
   el("#add-problem-btn").addEventListener("click", ()=>{
     const list=getActiveList(); if(!list) return;
@@ -913,12 +1030,13 @@ function bindEvents(){
     persist(); renderProblems();
   });
 
-  el("#export-btn").addEventListener("click", ()=>{
+  // 导出/导入全部
+  el("#export-btn")?.addEventListener("click", ()=>{
     const dataStr="data:application/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(state,null,2));
     const a=document.createElement("a"); a.href=dataStr; const date=new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
     a.download=`problem-lists-all-${date}.json`; a.click();
   });
-  el("#import-input").addEventListener("change", async (e)=>{
+  el("#import-input")?.addEventListener("change", async (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     try { const txt=await f.text(); const data=JSON.parse(txt);
       if(!data || !Array.isArray(data.lists)) { alert("导入失败：格式不正确"); return; }
@@ -927,14 +1045,15 @@ function bindEvents(){
     } catch(err){ console.error(err); alert("导入失败：解析错误"); }
   });
 
-  el("#export-list-btn").addEventListener("click", ()=>{
+  // 导出/导入题单
+  el("#export-list-btn")?.addEventListener("click", ()=>{
     const list=getActiveList(); if(!list){ alert("没有可导出的题单"); return; }
     const payload={ name:list.name, problems:list.problems||[] };
     const dataStr="data:application/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(payload,null,2));
     const a=document.createElement("a"); a.href=dataStr; const date=new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
     a.download=`problem-list-${sanitizeFilename(list.name)}-${date}.json`; a.click();
   });
-  el("#import-list-input").addEventListener("change", async (e)=>{
+  el("#import-list-input")?.addEventListener("change", async (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     try { const txt=await f.text(); const data=JSON.parse(txt);
       if(!data || !Array.isArray(data.problems)) { alert("导入失败：格式不正确（应包含 name 和 problems）"); return; }
@@ -949,17 +1068,17 @@ function bindEvents(){
     } catch(err){ console.error(err); alert("导入失败：解析错误"); }
   });
 
-  el("#manage-tags-btn").addEventListener("click", openTagsModal);
-  el("#tags-modal-close").addEventListener("click", closeTagsModal);
-
-  el("#new-cat-input").addEventListener("keydown",(e)=>{
+  // 标签库
+  el("#manage-tags-btn")?.addEventListener("click", openTagsModal);
+  el("#tags-modal-close")?.addEventListener("click", closeTagsModal);
+  el("#new-cat-input")?.addEventListener("keydown",(e)=>{
     if(e.key==="Enter"){ e.preventDefault(); const v=el("#new-cat-input").value.trim(); if(!v) return;
       if(!addCategory(v)) { alert("创建失败：名称为空/重复/为未分类"); return; }
       el("#new-cat-input").value=""; renderTagManager(); renderProblems();
     }
   });
 
-  // 小屏侧栏抽屉（行内“展开”按钮 + 遮罩 + 手势/ESC）
+  // 小屏侧栏抽屉和触屏手势
   const sidebar = el(".sidebar");
   const sidebarBackdrop = el("#sidebar-backdrop");
   const edgeOpen = el("#sidebar-edge-open");
@@ -985,17 +1104,58 @@ function bindEvents(){
     window.addEventListener("resize", () => { if (window.innerWidth > 900) closeSidebar(); });
 
     // 左缘右划打开
-    let startX=0,startY=0,tracking=false; const EDGE=20, OPEN_THRESHOLD=50, MAX_ANGLE=25;
-    window.addEventListener("touchstart",(e)=>{ if(window.innerWidth>900) return; if(sidebar.classList.contains("open")) return; const t=e.touches[0]; if(t.clientX<=EDGE){ startX=t.clientX; startY=t.clientY; tracking=true; }},{passive:true});
-    window.addEventListener("touchmove",(e)=>{ if(!tracking) return; const t=e.touches[0]; const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY); const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI; if(dx>0 && angle<MAX_ANGLE) e.preventDefault();},{passive:false});
-    window.addEventListener("touchend",(e)=>{ if(!tracking) return; tracking=false; const t=e.changedTouches[0]; const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY); const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI; if(dx>=OPEN_THRESHOLD && angle<MAX_ANGLE) openSidebar(); });
+    let startX=0,startY=0,tracking=false; const EDGE=24, OPEN_THRESHOLD=56, MAX_ANGLE=28;
+    window.addEventListener("touchstart",(e)=>{
+      if(window.innerWidth>900) return;
+      if(sidebar.classList.contains("open")) return;
+      const t=e.touches[0];
+      if(t.clientX<=EDGE){ startX=t.clientX; startY=t.clientY; tracking=true; }
+    },{passive:true});
+    window.addEventListener("touchmove",(e)=>{
+      if(!tracking) return;
+      const t=e.touches[0];
+      const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY);
+      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
+      if(dx>0 && angle<MAX_ANGLE) e.preventDefault();
+    },{passive:false});
+    window.addEventListener("touchend",(e)=>{
+      if(!tracking) return;
+      tracking=false;
+      const t=e.changedTouches[0];
+      const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY);
+      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
+      if(dx>=OPEN_THRESHOLD && angle<MAX_ANGLE) openSidebar();
+    });
+
+    // 打开后在侧栏内左划关闭
+    let closeStartX=0, closeStartY=0, closeTrack=false;
+    sidebar.addEventListener("touchstart",(e)=>{
+      if(window.innerWidth>900) return;
+      if(!sidebar.classList.contains("open")) return;
+      const t=e.touches[0];
+      closeStartX=t.clientX; closeStartY=t.clientY; closeTrack=true;
+    },{passive:true});
+    sidebar.addEventListener("touchmove",(e)=>{
+      if(!closeTrack) return;
+      const t=e.touches[0];
+      const dx=t.clientX-closeStartX, dy=Math.abs(t.clientY-closeStartY);
+      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
+      if(dx<0 && angle<MAX_ANGLE) e.preventDefault();
+    },{passive:false});
+    sidebar.addEventListener("touchend",(e)=>{
+      if(!closeTrack) return; closeTrack=false;
+      const t=e.changedTouches[0];
+      const dx=t.clientX-closeStartX, dy=Math.abs(t.clientY-closeStartY);
+      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
+      if(dx<=-OPEN_THRESHOLD && angle<MAX_ANGLE) closeSidebar();
+    });
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && window.innerWidth <= 900 && sidebar.classList.contains("open")) closeSidebar();
     });
   }
 
-  /* 随机 CF 抽题：预设、记忆化等（保持） */
+  // 随机 CF 抽题
   const cfBtn=el("#cf-random-btn"), cfModal=el("#cf-random-modal");
   if (cfBtn && cfModal) {
     const cfCloseTop = el("#cf-random-close");
@@ -1008,7 +1168,7 @@ function bindEvents(){
       if (handleEl && handleMsg) {
         let timer = 0;
         const showMsg = (st) => {
-          handleMsg.className = "cf-msg" + (st.ok ? " ok" : " error");
+          handleMsg.className = "small";
           if (!handleEl.value.trim()) { handleMsg.textContent = ""; return; }
           handleMsg.textContent = st.ok ? "账号有效" : (st.reason === "not_found" ? "账号不存在" : "网络错误，稍后重试");
         };
@@ -1023,8 +1183,8 @@ function bindEvents(){
       chip.addEventListener("click", ()=>{
         const min=chip.getAttribute("data-min"), max=chip.getAttribute("data-max");
         const minEl = el("#cf-rating-min"); const maxEl = el("#cf-rating-max");
-        if (minEl) { minEl.value = min || ""; setPref(CF_PREF_KEYS.ratingMin, minEl.value.trim()); }
-        if (maxEl) { maxEl.value = max || ""; setPref(CF_PREF_KEYS.ratingMax, maxEl.value.trim()); }
+        if (minEl) setPref("cf:random:ratingMin", (minEl.value = min || ""));
+        if (maxEl) setPref("cf:random:ratingMax", (maxEl.value = max || ""));
       });
     });
 
@@ -1115,20 +1275,16 @@ function bindEvents(){
   const emailInput = el("#auth-email");
   const passInput = el("#auth-password");
   const msgEl = el("#auth-msg");
-  const oauthGithub = el("#oauth-github");
-  const oauthGoogle = el("#oauth-google");
-  const syncStatus = el("#sync-status");
   const upBtn = el("#sync-upload-btn");
   const downBtn = el("#sync-download-btn");
 
   const setMsg = (t, isErr=false) => { if (!msgEl) return; msgEl.textContent = t || ""; msgEl.style.color = isErr ? "var(--danger)" : "var(--muted)"; };
-  const setSync = (t) => { if (syncStatus) syncStatus.textContent = t || ""; };
 
   if (loginBtn) {
     loginBtn.addEventListener("click", () => {
-      if (sidebar && sidebarBackdrop && window.innerWidth <= 900 && sidebar.classList.contains("open")) {
-        sidebar.classList.remove("open");
-        sidebarBackdrop.classList.remove("show");
+      const sidebar = el(".sidebar"); const backdrop = el("#sidebar-backdrop");
+      if (sidebar && backdrop && window.innerWidth <= 900 && sidebar.classList.contains("open")) {
+        sidebar.classList.remove("open"); backdrop.classList.remove("show");
       }
       openAuthModal();
     });
@@ -1165,70 +1321,13 @@ function bindEvents(){
   if (authSignup) authSignup.addEventListener("click", doSignup);
   if (passInput) passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 
-  // OAuth
-  const startOAuth = async (provider) => {
-    if (!supa) { alert("未配置 Supabase，无法登录。"); return; }
-    try {
-      const redirectTo = getRedirectTo();
-      setMsg(`跳转到 ${provider} 登录中...`);
-      await supa.auth.signInWithOAuth({ provider, options: { redirectTo } });
-    } catch (e) {
-      setMsg("第三方登录失败", true);
-      console.error(e);
-    }
-  };
-  if (oauthGithub) oauthGithub.addEventListener("click", () => startOAuth("github"));
-  if (oauthGoogle) oauthGoogle.addEventListener("click", () => startOAuth("google"));
-
-  // 手动同步：上传云端
-  if (upBtn) upBtn.addEventListener("click", async () => {
-    if (!supa || !authUser) { openAuthModal(); alert("请先登录账号，再执行上传。"); return; }
-    try {
-      upBtn.disabled = true; downBtn && (downBtn.disabled = true);
-      setSync("上传中...");
-      const { ok, error } = await saveRemoteState();
-      if (!ok) { console.error(error); setSync("上传失败"); alert("上传失败：" + (error?.message || "未知错误")); }
-      else { setSync("已上传"); setTimeout(()=>setSync(""), 1500); }
-    } finally {
-      upBtn.disabled = false; downBtn && (downBtn.disabled = !authUser);
-    }
-  });
-
-  // 手动同步：下载云端
-  if (downBtn) downBtn.addEventListener("click", async () => {
-    if (!supa || !authUser) { openAuthModal(); alert("请先登录账号，再执行下载。"); return; }
-    try {
-      upBtn && (upBtn.disabled = true); downBtn.disabled = true;
-      setSync("下载中...");
-      const remote = await loadRemoteState();
-      if (!remote) {
-        setSync("云端为空");
-        setTimeout(()=>setSync(""), 1500);
-        alert("云端暂无数据。可先在本设备点“上传云端”。");
-        return;
-      }
-      migrateState(remote);
-      state = remote;
-      saveState(state);
-      renderAll();
-      setSync("已下载");
-      setTimeout(()=>setSync(""), 1500);
-    } catch (e) {
-      console.error(e);
-      setSync("下载失败");
-      alert("下载失败：" + (e?.message || "未知错误"));
-    } finally {
-      upBtn && (upBtn.disabled = !authUser);
-      downBtn.disabled = !authUser;
-    }
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { closePopover(); closeTagsModal(); closeCFRandomModal(); closeAuthModal(); }
-  });
+  // “更多”菜单
+  initMoreMenu();
 }
 
+/* 工具函数 */
 function sanitizeFilename(s){ return String(s||"list").replace(/[\\/:*?"<>|]/g,"_").slice(0,60); }
+function inputEl(sel){ return document.querySelector(sel); }
 
 /* 渲染：列表侧栏与工具栏 */
 function renderLists() {
@@ -1253,21 +1352,32 @@ function renderToolbar() {
   if (input) input.value = list ? list.name : "";
 }
 
+/* 登录弹窗开关 */
+function openAuthModal(){
+  const n=el("#auth-modal");
+  if(!n){ alert("登录模块未加载"); return; }
+  if(!supa){ alert("未配置 Supabase，无法登录。\n请在 supabase-config.js 中填写 anonKey。"); return; }
+  n.classList.remove("hidden");
+}
+function closeAuthModal(){ const n=el("#auth-modal"); if(n) n.classList.add("hidden"); }
+
 /* 初始化 */
 function renderAll(){ renderLists(); renderToolbar(); renderProblems(); }
 
 function init(){
-  if (init.__ran) return;     // 防止重复执行
+  if (init.__ran) return;
   init.__ran = true;
+  initTheme();          // +++ 先应用主题，避免首次渲染闪烁
   bindEvents();
+  setupSidebarResizer && setupSidebarResizer();
   renderAll();
   initSupabase();
 }
 
-// DOM 已就绪则立即运行，否则等 DOMContentLoaded
+
+// DOM 已就绪
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);
 } else {
   init();
 }
-
