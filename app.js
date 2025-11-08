@@ -1118,52 +1118,107 @@ function bindEvents(){
     sidebarBackdrop.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); closeSidebar(); });
     window.addEventListener("resize", () => { if (window.innerWidth > 900) closeSidebar(); });
 
-    // 左缘右划打开
-    let startX=0,startY=0,tracking=false; const EDGE=24, OPEN_THRESHOLD=56, MAX_ANGLE=28;
-    window.addEventListener("touchstart",(e)=>{
-      if(window.innerWidth>900) return;
-      if(sidebar.classList.contains("open")) return;
-      const t=e.touches[0];
-      if(t.clientX<=EDGE){ startX=t.clientX; startY=t.clientY; tracking=true; }
-    },{passive:true});
-    window.addEventListener("touchmove",(e)=>{
-      if(!tracking) return;
-      const t=e.touches[0];
-      const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY);
-      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
-      if(dx>0 && angle<MAX_ANGLE) e.preventDefault();
-    },{passive:false});
-    window.addEventListener("touchend",(e)=>{
-      if(!tracking) return;
-      tracking=false;
-      const t=e.changedTouches[0];
-      const dx=t.clientX-startX, dy=Math.abs(t.clientY-startY);
-      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
-      if(dx>=OPEN_THRESHOLD && angle<MAX_ANGLE) openSidebar();
-    });
+    // 题目范围内（.table-wrap）右滑打开 / 左滑关闭（仅窄屏）
+    const contentArea = el(".table-wrap"); // 若想整个主区域可触发，可改为 el(".main")
+    if (contentArea) {
+      let startX = 0, startY = 0, startTs = 0, tracking = false, intent = null; // intent: "open" | "close"
 
-    // 打开后在侧栏内左划关闭
-    let closeStartX=0, closeStartY=0, closeTrack=false;
-    sidebar.addEventListener("touchstart",(e)=>{
-      if(window.innerWidth>900) return;
-      if(!sidebar.classList.contains("open")) return;
-      const t=e.touches[0];
-      closeStartX=t.clientX; closeStartY=t.clientY; closeTrack=true;
-    },{passive:true});
-    sidebar.addEventListener("touchmove",(e)=>{
-      if(!closeTrack) return;
-      const t=e.touches[0];
-      const dx=t.clientX-closeStartX, dy=Math.abs(t.clientY-closeStartY);
-      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
-      if(dx<0 && angle<MAX_ANGLE) e.preventDefault();
-    },{passive:false});
-    sidebar.addEventListener("touchend",(e)=>{
-      if(!closeTrack) return; closeTrack=false;
-      const t=e.changedTouches[0];
-      const dx=t.clientX-closeStartX, dy=Math.abs(t.clientY-closeStartY);
-      const angle=Math.atan2(dy,Math.abs(dx))*180/Math.PI;
-      if(dx<=-OPEN_THRESHOLD && angle<MAX_ANGLE) closeSidebar();
-    });
+      const OPEN_THRESHOLD = 50;     // 常规右滑打开距离
+      const CLOSE_THRESHOLD = 50;    // 常规左滑关闭距离
+      const FAST_PX = 120;           // 快速滑动距离
+      const FAST_MS = 250;           // 快速滑动时间阈值
+      const MAX_ANGLE = 28;          // 与水平夹角上限（越小越“更水平”）
+
+      const isNarrow = () => window.innerWidth <= 900;
+      const isInteractive = (target) =>
+        !!target.closest('input, textarea, select, button, a, [contenteditable="true"], .popover, .modal');
+
+      contentArea.addEventListener("touchstart", (e) => {
+        if (!isNarrow()) return;
+        if (isInteractive(e.target)) return;
+
+        const t = e.touches[0];
+        startX = t.clientX; startY = t.clientY; startTs = Date.now();
+        // 未打开 → 右滑打开；已打开 → 左滑关闭
+        intent = sidebar.classList.contains("open") ? "close" : "open";
+        tracking = true;
+      }, { passive: true });
+
+      contentArea.addEventListener("touchmove", (e) => {
+        if (!tracking) return;
+
+        const t = e.touches[0];
+        const dx = t.clientX - startX;
+        const dy = Math.abs(t.clientY - startY);
+        const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
+
+        // 水平方向时，阻止页面纵向滚动
+        if ((intent === "open" && dx > 0 && angle < MAX_ANGLE) ||
+            (intent === "close" && dx < 0 && angle < MAX_ANGLE)) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      contentArea.addEventListener("touchend", (e) => {
+        if (!tracking) return;
+        tracking = false;
+
+        const t = e.changedTouches[0];
+        const dx = t.clientX - startX;
+        const dy = Math.abs(t.clientY - startY);
+        const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
+        const dt = Date.now() - startTs;
+
+        const normalOpen  = (dx >=  OPEN_THRESHOLD) && angle < MAX_ANGLE;
+        const fastOpen    = (dx >=  FAST_PX)       && (dt <= FAST_MS) && angle < MAX_ANGLE;
+        const normalClose = (dx <= -CLOSE_THRESHOLD) && angle < MAX_ANGLE;
+        const fastClose   = (dx <= -FAST_PX)         && (dt <= FAST_MS) && angle < MAX_ANGLE;
+
+        if (intent === "open" && !sidebar.classList.contains("open") && (normalOpen || fastOpen)) {
+          openSidebar();
+        } else if (intent === "close" && sidebar.classList.contains("open") && (normalClose || fastClose)) {
+          closeSidebar();
+        }
+      }, { passive: true });
+    }
+
+    // 侧栏内左滑关闭（兜底；仅窄屏）
+    sidebar.addEventListener("touchstart", (e) => {
+      if (window.innerWidth > 900) return;
+      if (!sidebar.classList.contains("open")) return;
+      const t = e.touches[0];
+      sidebar.__sx = t.clientX;
+      sidebar.__sy = t.clientY;
+      sidebar.__ts = Date.now();
+      sidebar.__trk = true;
+    }, { passive: true });
+
+    sidebar.addEventListener("touchmove", (e) => {
+      if (!sidebar.__trk) return;
+      const t = e.touches[0];
+      const dx = t.clientX - sidebar.__sx;
+      const dy = Math.abs(t.clientY - sidebar.__sy);
+      const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
+      if (dx < 0 && angle < 28) e.preventDefault();
+    }, { passive: false });
+
+    sidebar.addEventListener("touchend", (e) => {
+      if (!sidebar.__trk) return;
+      sidebar.__trk = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sidebar.__sx;
+      const dy = Math.abs(t.clientY - sidebar.__sy);
+      const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
+      const dt = Date.now() - sidebar.__ts;
+
+      const normalClose = (dx <= -50) && angle < 28;
+      const fastClose   = (dx <= -120) && (dt <= 250) && angle < 28;
+
+      if (sidebar.classList.contains("open") && (normalClose || fastClose)) {
+        closeSidebar();
+      }
+    }, { passive: true });
+
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && window.innerWidth <= 900 && sidebar.classList.contains("open")) closeSidebar();
