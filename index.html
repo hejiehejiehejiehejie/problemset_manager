@@ -25,10 +25,9 @@
 
       <nav id="lists" aria-label="题单列表"></nav>
 
-      <!-- 底部分隔线（不放按钮了） -->
       <div class="sidebar-actions"></div>
 
-      <!-- 宽屏拖拽柄：拖动可调整侧栏宽度 -->
+      <!-- 宽屏拖拽柄 -->
       <div id="sidebar-resizer" class="sidebar-resizer" title="拖动调整侧栏宽度" aria-hidden="true"></div>
     </aside>
 
@@ -53,11 +52,12 @@
           <button id="add-problem-btn">新增题目</button>
           <button id="cf-random-btn" title="随机抽取 Codeforces 题目">随机CF</button>
 
-          <!-- 从这里开始整体推到最右边 -->
+          <!-- 右侧对齐 -->
           <span id="sync-status" class="sync-status" aria-live="polite" style="margin-left:auto;"></span>
           <button id="theme-toggle" class="icon-btn" title="切换主题" aria-label="切换主题">☾</button>
           <button id="toolbar-more-btn" class="icon-btn" title="更多" aria-label="更多">⋯</button>
-          <!-- 隐藏的原控件：菜单项通过它们触发（保持 app.js 逻辑） -->
+
+          <!-- 隐藏的原控件（“更多”菜单复用其逻辑） -->
           <div class="hidden-actions">
             <!-- 题单级 -->
             <button id="export-list-btn" title="导出当前题单">导出题单</button>
@@ -71,13 +71,22 @@
             <button id="sync-upload-btn" title="将本地数据上传到云端（覆盖云端）">上传云端</button>
             <button id="sync-download-btn" title="从云端下载数据（覆盖本地）">下载云端</button>
 
-            <!-- 全部数据（从侧栏合并过来） -->
+            <!-- 全部数据 -->
             <button id="export-btn">导出全部数据</button>
             <label class="import-label">
               导入全部数据
               <input id="import-input" type="file" accept="application/json" />
             </label>
           </div>
+        </div>
+      </div>
+
+      <!-- 更新提示条（有新版本时显示） -->
+      <div id="update-banner" class="update-banner hidden" role="status" aria-live="polite">
+        <span class="update-text">有新版本可用</span>
+        <div class="update-actions">
+          <button id="update-reload-btn" class="btn-primary btn-xs">立即更新</button>
+          <button id="update-dismiss-btn" class="btn-xxs">稍后</button>
         </div>
       </div>
 

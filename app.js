@@ -1,8 +1,11 @@
-/* 题单管理器（宽屏侧栏可拖动调宽，窄屏抽屉；工具栏“更多”菜单；随机CF/标签库/Supabase/导入导出） */
+/* 题单管理器（含：主题切换、宽屏侧栏可调、触屏抽屉、更多菜单、随机CF、标签库、Supabase 登录与手动同步、定期版本更新） */
 
+const APP_VERSION = "1.0.0"; // 手动更新版本时可修改，便于诊断
 const STORAGE_KEY = "problem-lists:v1";
 const UNCATEGORIZED_NAME = "未分类";
-const SIDEBAR_W_KEY = "plm:sidebar-w"; // 本地存储侧栏宽度
+const SIDEBAR_W_KEY = "plm:sidebar-w";
+const THEME_KEY = "plm:theme";
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const el = (sel, root = document) => root.querySelector(sel);
@@ -10,6 +13,38 @@ const els = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const dedup = (arr) => Array.from(new Set((arr || []).filter(Boolean)));
 const byNameAsc = (a, b) => String(a || "").localeCompare(String(b || ""));
 function normalizeTag(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
+
+/* 主题 */
+function getSystemTheme() {
+  try { return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; }
+  catch { return "dark"; }
+}
+function applyTheme(theme) {
+  const t = (theme === "light" || theme === "dark") ? theme : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", t === "light" ? "#ffffff" : "#161b22");
+  const btn = el("#theme-toggle");
+  if (btn) {
+    if (t === "light") { btn.textContent = "☀"; btn.title = "切换到深色模式"; }
+    else { btn.textContent = "☾"; btn.title = "切换到浅色模式"; }
+  }
+}
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch {}
+  const initial = saved || getSystemTheme();
+  applyTheme(initial);
+  const btn = el("#theme-toggle");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      const cur = document.documentElement.getAttribute("data-theme") || "dark";
+      const next = (cur === "light") ? "dark" : "light";
+      applyTheme(next);
+      try { localStorage.setItem(THEME_KEY, next); } catch {}
+    });
+  }
+}
 
 /* 短标题解析：CF/洛谷/AtCoder */
 function parseCodeforcesShort(url) {
@@ -59,53 +94,14 @@ function parseAtcoderShort(url) {
   }
   return "";
 }
-function parseShortTitle(url) {
-  return parseCodeforcesShort(url) || parseLuoguShort(url) || parseAtcoderShort(url) || "";
-}
+function parseShortTitle(url) { return parseCodeforcesShort(url) || parseLuoguShort(url) || parseAtcoderShort(url) || ""; }
 function trySetTitleFromUrl(problem) {
   const code = parseShortTitle(problem.url);
   if (code && !String(problem.title || "").trim()) { problem.title = code; return true; }
   return false;
 }
 
-/* 主题切换 */
-const THEME_KEY = "plm:theme"; // "light" | "dark"
-
-function getSystemTheme() {
-  try { return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; }
-  catch { return "dark"; }
-}
-function applyTheme(theme) {
-  const t = (theme === "light" || theme === "dark") ? theme : "dark";
-  document.documentElement.setAttribute("data-theme", t);
-  // 更新 PWA 主题色（移动端地址栏等）
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", t === "light" ? "#ffffff" : "#161b22");
-  // 更新按钮图标与提示
-  const btn = el("#theme-toggle");
-  if (btn) {
-    if (t === "light") { btn.textContent = "☀"; btn.title = "切换到深色模式"; }
-    else { btn.textContent = "☾"; btn.title = "切换到浅色模式"; }
-  }
-}
-function initTheme() {
-  let saved = null;
-  try { saved = localStorage.getItem(THEME_KEY); } catch {}
-  const initial = saved || getSystemTheme();   // 没有保存时跟随系统
-  applyTheme(initial);
-  const btn = el("#theme-toggle");
-  if (btn) {
-    btn.addEventListener("click", () => {
-      const cur = document.documentElement.getAttribute("data-theme") || "dark";
-      const next = (cur === "light") ? "dark" : "light";
-      applyTheme(next);
-      try { localStorage.setItem(THEME_KEY, next); } catch {}
-    });
-  }
-}
-
-
-/* 拖拽重排（带自动滚动） */
+/* 拖拽重排 */
 function enableDragSort(container, itemSelector, onReorder) {
   if (container.__dndCleanup) container.__dndCleanup();
   container.querySelectorAll(".drag-placeholder").forEach((n) => n.remove());
@@ -190,7 +186,7 @@ function enableDragSort(container, itemSelector, onReorder) {
   return { refresh() { unbindAll(); bindAll(); }, cleanup() { unbindAll(); delete container.__dndCleanup; } };
 }
 
-/* 状态加载/保存与迁移 */
+/* 状态存取与迁移 */
 function rebuildFlatTagsFromProblems(st) {
   const all = []; (st.lists || []).forEach((l) => (l.problems || []).forEach((p) => all.push(...(p.tags || []))));
   return dedup(all).sort(byNameAsc);
@@ -221,7 +217,7 @@ function createDefaultState() {
   ensureTagLibrary(st); return st;
 }
 
-/* 标签库操作（略：与前一致） */
+/* 标签库（CRUD） */
 function getCategories() { return state.tagLibrary.categories; }
 function findCatById(id) { return getCategories().find((c) => c.id === id); }
 function findOrCreateUncategorized() {
@@ -311,7 +307,6 @@ let supa = null;
 let authUser = null;
 const STATE_TABLE = "plm_states";
 
-/* OAuth 回跳 */
 function getRedirectTo() {
   try {
     const conf = window.SUPABASE_CONFIG || {};
@@ -339,7 +334,6 @@ function initSupabase() {
     });
   } catch (e) { console.warn("Supabase init failed", e); updateAccountUI(); }
 }
-
 function updateAccountUI() {
   const emailEl = el("#account-email");
   const loginBtn = el("#login-btn");
@@ -374,7 +368,7 @@ async function saveRemoteState() {
   return { ok: true };
 }
 
-/* 单元格渲染：标题/难度/链接/代码 */
+/* 单元格渲染（标题/难度/链接/代码） */
 function renderTitleCell(p, cell) {
   cell.setAttribute("data-label","标题");
   cell.innerHTML = "";
@@ -485,7 +479,7 @@ function matchQuery(p, q) {
   return hay.includes(s);
 }
 
-/* Popover（菜单与标签选择共用） */
+/* Popover（共享） */
 let currentPopover = null;
 let currentPopoverAnchor = null;
 let __popRaf = 0;
@@ -533,10 +527,7 @@ function onWindowResize(){
   positionPopover(currentPopover, currentPopoverAnchor);
 }
 function togglePopover(anchorEl, builder) {
-  if (currentPopover && currentPopoverAnchor === anchorEl) { // 再次点击同一锚点：收起
-    closePopover();
-    return;
-  }
+  if (currentPopover && currentPopoverAnchor === anchorEl) { closePopover(); return; }
   if (currentPopover) closePopover();
   const pop = builder();
   document.body.appendChild(pop);
@@ -549,11 +540,13 @@ function togglePopover(anchorEl, builder) {
     window.addEventListener("scroll", onWindowScroll, true);
   });
 }
+
+/* 标签选择 popover */
 function buildTagPopover(problem, anchorEl, onChanged) {
   const pop=document.createElement("div"); pop.className="popover";
   const s1=document.createElement("div"); s1.className="pop-section";
   const h4a=document.createElement("h4"); h4a.textContent="添加新标签";
-  const inputNew=input("text","","输入新标签后回车（加入未分类）"); inputNew.classList.add("input-sm");
+  const inputNew=document.createElement("input"); inputNew.type="text"; inputNew.placeholder="输入新标签后回车（加入未分类）"; inputNew.classList.add("input-sm");
   inputNew.addEventListener("keydown",(e)=>{
     if(e.key==="Enter"){e.preventDefault();
       const v=inputNew.value.trim(); if(!v) return;
@@ -585,7 +578,7 @@ function buildTagPopover(problem, anchorEl, onChanged) {
         tagBox.appendChild(chip);
       });
     }
-    const addIn=input("text","",`在「${c.name}」新增标签后回车`); addIn.classList.add("input-sm"); addIn.style.marginTop="6px";
+    const addIn=document.createElement("input"); addIn.type="text"; addIn.placeholder=`在「${c.name}」新增标签后回车`; addIn.classList.add("input-sm"); addIn.style.marginTop="6px";
     addIn.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); const v=addIn.value.trim(); if(!v) return;
       if (addTagToCategory(c.id,v)) { addTagToProblem(problem,v); onChanged(); addIn.value=""; closePopover(); } }});
     body.appendChild(tagBox); body.appendChild(addIn);
@@ -596,7 +589,7 @@ function buildTagPopover(problem, anchorEl, onChanged) {
   pop.appendChild(s2); return pop;
 }
 
-/* 渲染题目表（略同前） */
+/* 渲染题目表 */
 function renderProblems() {
   const list=getActiveList(); const tbody=el("#problems-tbody"); const q=el("#search-input").value;
   tbody.innerHTML=""; if (!list) return;
@@ -635,7 +628,8 @@ function renderProblems() {
     renderCodeLinkCell(p, el(".cell-code", tr));
 
     const actCell=el(".cell-actions", tr); const rowActions=document.createElement("div"); rowActions.className="row-actions";
-    const delBtn=button("删除","danger"); delBtn.addEventListener("click",()=>{
+    const delBtn=document.createElement("button"); delBtn.textContent="删除"; delBtn.className="danger";
+    delBtn.addEventListener("click",()=>{
       if (!confirm(`确认删除题目「${p.title||"未命名"}」？`)) return;
       const idx=list.problems.findIndex((x)=>x.id===p.id); if (idx>=0) list.problems.splice(idx,1);
       persist(); renderAll();
@@ -669,13 +663,12 @@ function renderProblems() {
   }
 }
 
-/* DOM 小工具 */
-function input(type, value="", placeholder=""){ const i=document.createElement("input"); i.type=type; i.value=value||""; i.placeholder=placeholder; return i; }
-function button(text, cls = "") { const b = document.createElement("button"); b.textContent = text; if (cls) cls.split(/\s+/).filter(Boolean).forEach(c => b.classList.add(c)); return b; }
+/* DOM 工具 */
 function escapeHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function persist(){ saveState(state); }
+function sanitizeFilename(s){ return String(s||"list").replace(/[\\/:*?"<>|]/g,"_").slice(0,60); }
 
-/* 标签库管理（略同前） */
+/* 标签库管理面板 */
 function openTagsModal(){ el("#tags-modal").classList.remove("hidden"); renderTagManager(); }
 function closeTagsModal(){ el("#tags-modal").classList.add("hidden"); }
 function renderTagManager(){
@@ -687,7 +680,7 @@ function renderTagManager(){
     const head=document.createElement("div"); head.className="lib-cat-head";
     const nameLabel=document.createElement("span"); nameLabel.textContent=c.name; nameLabel.style.fontWeight="600";
     const spacer=document.createElement("div"); spacer.className="spacer";
-    const delCatBtn=button("×","danger"); delCatBtn.title=`删除分类：${c.name}`;
+    const delCatBtn=document.createElement("button"); delCatBtn.textContent="×"; delCatBtn.title=`删除分类：${c.name}`; delCatBtn.className="danger";
     delCatBtn.style.width="28px"; delCatBtn.style.height="28px"; delCatBtn.style.padding="0";
     delCatBtn.addEventListener("click", ()=>{
       if (c.name === UNCATEGORIZED_NAME) { alert("不能删除「未分类」"); return; }
@@ -714,15 +707,15 @@ function renderTagManager(){
     const controls=document.createElement("div"); controls.className="lib-controls";
     function renderAddButton(){
       controls.innerHTML="";
-      const addBtn=button("添加标签","btn-xxs");
+      const addBtn=document.createElement("button"); addBtn.textContent="添加标签"; addBtn.className="btn-xxs";
       addBtn.addEventListener("click", showAddInput);
       controls.appendChild(addBtn);
     }
     function showAddInput(){
       controls.innerHTML="";
-      const inputEl=input("text","",`在「${c.name}」新增标签后回车`); inputEl.classList.add("input-sm"); inputEl.style.maxWidth="260px";
-      const okBtn=button("确定","btn-primary btn-xxs");
-      const cancelBtn=button("取消","btn-xxs");
+      const inputEl=document.createElement("input"); inputEl.type="text"; inputEl.placeholder=`在「${c.name}」新增标签后回车`; inputEl.classList.add("input-sm"); inputEl.style.maxWidth="260px";
+      const okBtn=document.createElement("button"); okBtn.textContent="确定"; okBtn.className="btn-primary btn-xxs";
+      const cancelBtn=document.createElement("button"); cancelBtn.textContent="取消"; cancelBtn.className="btn-xxs";
       okBtn.addEventListener("click",()=>{
         const v=(inputEl.value||"").trim(); if(!v){ inputEl.focus(); return; }
         if (!addTagToCategory(c.id,v)) { alert("新增失败：标签名为空"); return; }
@@ -749,27 +742,14 @@ function renderTagManager(){
   });
 }
 
-/* 随机 CF 抽题（略：与前一致） */
+/* 随机 CF 抽题 */
 const CF_CACHE_KEY="cf:problemset:v1"; const CF_CACHE_TTL_MS=1000*60*60*24;
-const CF_PREF_KEYS = {
-  includeTags: "cf:random:includeTags",
-  ratingMin: "cf:random:ratingMin",
-  ratingMax: "cf:random:ratingMax",
-  tags: "cf:random:tags",
-  count: "cf:random:count",
-  handle: "cf:random:handle",
-  excludeSolved: "cf:random:excludeSolved",
-};
+const CF_PREF_KEYS = { includeTags: "cf:random:includeTags", ratingMin: "cf:random:ratingMin", ratingMax: "cf:random:ratingMax", tags: "cf:random:tags", count: "cf:random:count", handle: "cf:random:handle", excludeSolved: "cf:random:excludeSolved" };
 function getPref(key, defVal=null) { try { const v = localStorage.getItem(key); return v === null ? defVal : v; } catch { return defVal; } }
 function setPref(key, val) { try { if (val==null || val==="") localStorage.removeItem(key); else localStorage.setItem(key, String(val)); } catch {} }
 function applyCFRandomPrefs() {
-  const ck = el("#cf-include-tags");
-  const minEl = el("#cf-rating-min");
-  const maxEl = el("#cf-rating-max");
-  const tagsEl = el("#cf-tags");
-  const countEl = el("#cf-count");
-  const handleEl = el("#cf-handle");
-  const exSolvedEl = el("#cf-exclude-solved");
+  const ck = el("#cf-include-tags"); const minEl = el("#cf-rating-min"); const maxEl = el("#cf-rating-max");
+  const tagsEl = el("#cf-tags"); const countEl = el("#cf-count"); const handleEl = el("#cf-handle"); const exSolvedEl = el("#cf-exclude-solved");
   if (ck) ck.checked = getPref(CF_PREF_KEYS.includeTags, "1") !== "0";
   if (minEl) minEl.value = getPref(CF_PREF_KEYS.ratingMin, "") || "";
   if (maxEl) maxEl.value = getPref(CF_PREF_KEYS.ratingMax, "") || "";
@@ -779,13 +759,8 @@ function applyCFRandomPrefs() {
   if (exSolvedEl) exSolvedEl.checked = getPref(CF_PREF_KEYS.excludeSolved, "0") === "1";
 }
 function saveCFRandomPrefsFromForm() {
-  const ck = el("#cf-include-tags");
-  const minEl = el("#cf-rating-min");
-  const maxEl = el("#cf-rating-max");
-  const tagsEl = el("#cf-tags");
-  const countEl = el("#cf-count");
-  const handleEl = el("#cf-handle");
-  const exSolvedEl = el("#cf-exclude-solved");
+  const ck = el("#cf-include-tags"); const minEl = el("#cf-rating-min"); const maxEl = el("#cf-rating-max");
+  const tagsEl = el("#cf-tags"); const countEl = el("#cf-count"); const handleEl = el("#cf-handle"); const exSolvedEl = el("#cf-exclude-solved");
   if (ck) setPref(CF_PREF_KEYS.includeTags, ck.checked ? "1" : "0");
   if (minEl) setPref(CF_PREF_KEYS.ratingMin, minEl.value.trim());
   if (maxEl) setPref(CF_PREF_KEYS.ratingMax, maxEl.value.trim());
@@ -882,7 +857,7 @@ function cfProblemToAppItem(p, includeTags=true){
 function openCFRandomModal(){ el("#cf-random-modal").classList.remove("hidden"); }
 function closeCFRandomModal(){ el("#cf-random-modal").classList.add("hidden"); }
 
-/* 工具栏“更多”菜单 */
+/* “更多”菜单 */
 function initMoreMenu() {
   const $ = (s, r=document) => r.querySelector(s);
   const clickSel = (s) => { const n = $(s); if (n) n.click(); };
@@ -893,18 +868,12 @@ function initMoreMenu() {
     const menu = document.createElement("div");
     menu.className = "menu";
     for (const it of items) {
-      if (it.type === "divider") {
-        const hr = document.createElement("div"); hr.className = "menu-divider"; menu.appendChild(hr);
-        continue;
-      }
+      if (it.type === "divider") { const hr = document.createElement("div"); hr.className = "menu-divider"; menu.appendChild(hr); continue; }
       const btn = document.createElement("button");
       btn.className = "menu-item";
       btn.textContent = it.text;
       if (it.disabled) btn.disabled = true;
-      btn.addEventListener("click", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        try { it.onClick?.(); } finally { closePopover(); }
-      });
+      btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); try { it.onClick?.(); } finally { closePopover(); } });
       menu.appendChild(btn);
     }
     pop.appendChild(menu);
@@ -915,15 +884,13 @@ function initMoreMenu() {
   if (toolbarMore) {
     toolbarMore.addEventListener("click", (e) => {
       e.preventDefault();
-      const upBtn = el("#sync-upload-btn");
-      const downBtn = el("#sync-download-btn");
       const items = [
         { text: "标签库", onClick: () => clickSel("#manage-tags-btn") },
         { text: "导出题单", onClick: () => clickSel("#export-list-btn") },
         { text: "导入题单", onClick: () => clickSel("#import-list-input") },
         { type: "divider" },
-        { text: "上传云端", onClick: () => clickSel("#sync-upload-btn"), disabled: !!(upBtn && upBtn.disabled) },
-        { text: "下载云端", onClick: () => clickSel("#sync-download-btn"), disabled: !!(downBtn && downBtn.disabled) },
+        { text: "上传云端", onClick: runSyncUpload, disabled: !authUser },
+        { text: "下载云端", onClick: runSyncDownload, disabled: !authUser },
         { type: "divider" },
         { text: "导出全部数据", onClick: () => clickSel("#export-btn") },
         { text: "导入全部数据", onClick: () => clickSel("#import-input") },
@@ -933,65 +900,104 @@ function initMoreMenu() {
   }
 }
 
-/* 宽屏：侧栏可拖拽调整宽度 */
-function setupSidebarResizer() {
-  const handle = el("#sidebar-resizer");
-  const sidebar = el(".sidebar");
-  if (!handle || !sidebar) return;
+/* 手动同步（抽成可调用函数，菜单可直接调用） */
+function setSyncStatus(t) { const n = el("#sync-status"); if (n) n.textContent = t || ""; }
 
-  const MIN_W = 240; // 与 CSS min-width 保持一致
-  const getMaxW = () => Math.max(MIN_W, Math.min(600, Math.floor(window.innerWidth * 0.6)));
-
-  // 应用/保存宽度
-  const applyW = (w) => document.documentElement.style.setProperty("--sidebar-w", `${w}px`);
-  const saveW = (w) => { try { localStorage.setItem(SIDEBAR_W_KEY, String(w)); } catch {} };
-  const getCurrentW = () => {
-    const v = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sidebar-w"), 10);
-    return Number.isFinite(v) ? v : Math.round(sidebar.getBoundingClientRect().width);
-  };
-  const clampW = (w) => Math.max(MIN_W, Math.min(getMaxW(), w));
-
-  // 初始化：读取本地配置
+async function runSyncUpload() {
+  if (!supa || !authUser) { openAuthModal(); alert("请先登录账号，再执行上传。"); return; }
+  const upBtn = el("#sync-upload-btn");
+  const downBtn = el("#sync-download-btn");
   try {
-    const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || "", 10);
-    if (Number.isFinite(saved)) applyW(clampW(saved));
-  } catch {}
+    if (upBtn) upBtn.disabled = true;
+    if (downBtn) downBtn.disabled = true;
+    setSyncStatus("上传中...");
+    const { ok, error } = await saveRemoteState();
+    if (!ok) { console.error(error); setSyncStatus("上传失败"); alert("上传失败：" + (error?.message || "未知错误")); }
+    else { setSyncStatus("已上传"); setTimeout(()=>setSyncStatus(""), 1500); }
+  } finally {
+    if (upBtn) upBtn.disabled = !authUser;
+    if (downBtn) downBtn.disabled = !authUser;
+  }
+}
+async function runSyncDownload() {
+  if (!supa || !authUser) { openAuthModal(); alert("请先登录账号，再执行下载。"); return; }
+  const upBtn = el("#sync-upload-btn");
+  const downBtn = el("#sync-download-btn");
+  try {
+    if (upBtn) upBtn.disabled = true;
+    if (downBtn) downBtn.disabled = true;
+    setSyncStatus("下载中...");
+    const remote = await loadRemoteState();
+    if (!remote) {
+      setSyncStatus("云端为空"); setTimeout(()=>setSyncStatus(""), 1500);
+      alert("云端暂无数据。可先在本设备点“上传云端”。");
+      return;
+    }
+    migrateState(remote); state = remote; saveState(state); renderAll();
+    setSyncStatus("已下载"); setTimeout(()=>setSyncStatus(""), 1500);
+  } catch (e) {
+    console.error(e); setSyncStatus("下载失败"); alert("下载失败：" + (e?.message || "未知错误"));
+  } finally {
+    if (upBtn) upBtn.disabled = !authUser;
+    if (downBtn) downBtn.disabled = !authUser;
+  }
+}
 
-  let active = false, startX = 0, startW = 0;
+/* SW 定期更新：自动检查 + 可视提示 + 一键更新 */
+function initAutoUpdater() {
+  if (!('serviceWorker' in navigator)) return;
 
-  const onMove = (e) => {
-    if (!active) return;
-    const dx = e.clientX - startX;
-    const w = clampW(startW + dx);
-    applyW(w);
-  };
-  const onUp = () => {
-    if (!active) return;
-    active = false;
-    document.body.classList.remove("resizing");
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    const w = getCurrentW();
-    saveW(clampW(w));
-  };
+  const banner = el("#update-banner");
+  const reloadBtn = el("#update-reload-btn");
+  const dismissBtn = el("#update-dismiss-btn");
+  let newWorker = null;
+  let refreshing = false;
 
-  handle.addEventListener("pointerdown", (e) => {
-    if (window.innerWidth <= 900) return; // 窄屏不处理
-    e.preventDefault();
-    active = true;
-    startX = e.clientX;
-    startW = sidebar.getBoundingClientRect().width;
-    document.body.classList.add("resizing");
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  });
+  function showBanner() { if (banner) banner.classList.remove("hidden"); }
+  function hideBanner() { if (banner) banner.classList.add("hidden"); }
 
-  // 窗口变化时保持限制
-  window.addEventListener("resize", () => {
-    if (window.innerWidth <= 900) return;
-    const w = clampW(getCurrentW());
-    applyW(w); saveW(w);
-  });
+  navigator.serviceWorker.getRegistration().then((reg) => {
+    if (!reg) return;
+
+    // 检测新 SW 安装完成但等待中
+    reg.addEventListener("updatefound", () => {
+      const installing = reg.installing;
+      if (!installing) return;
+      installing.addEventListener("statechange", () => {
+        if (installing.state === "installed" && navigator.serviceWorker.controller) {
+          newWorker = installing;
+          showBanner();
+        }
+      });
+    });
+
+    // 初始检查一次
+    reg.update().catch(()=>{});
+
+    // 定时检查
+    setInterval(() => { reg.update().catch(()=>{}); }, UPDATE_CHECK_INTERVAL_MS);
+
+    // 页面重新可见时也检查
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") reg.update().catch(()=>{});
+    });
+
+    // 一键更新：要求等待中的 SW 立即激活
+    const requestSkipWaiting = () => {
+      const waiting = reg.waiting || newWorker;
+      if (waiting) waiting.postMessage({ type: "SKIP_WAITING" });
+    };
+
+    if (reloadBtn) reloadBtn.addEventListener("click", () => { requestSkipWaiting(); });
+    if (dismissBtn) dismissBtn.addEventListener("click", () => hideBanner());
+
+    // 新 SW 接管后刷新一次
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  }).catch(()=>{});
 }
 
 /* 事件绑定 */
@@ -1078,21 +1084,14 @@ function bindEvents(){
     }
   });
 
-  // 小屏侧栏抽屉和触屏手势
+  // 窄屏侧栏抽屉 + 手势
   const sidebar = el(".sidebar");
   const sidebarBackdrop = el("#sidebar-backdrop");
   const edgeOpen = el("#sidebar-edge-open");
 
   if (sidebar && sidebarBackdrop) {
-    const openSidebar = () => {
-      if (window.innerWidth > 900) return;
-      sidebar.classList.add("open");
-      sidebarBackdrop.classList.add("show");
-    };
-    const closeSidebar = () => {
-      sidebar.classList.remove("open");
-      sidebarBackdrop.classList.remove("show");
-    };
+    const openSidebar = () => { if (window.innerWidth > 900) return; sidebar.classList.add("open"); sidebarBackdrop.classList.add("show"); };
+    const closeSidebar = () => { sidebar.classList.remove("open"); sidebarBackdrop.classList.remove("show"); };
 
     if (edgeOpen) {
       const onOpen = (e) => { e.preventDefault(); e.stopPropagation(); openSidebar(); };
@@ -1100,7 +1099,6 @@ function bindEvents(){
       edgeOpen.addEventListener("touchend", onOpen, { passive: false });
     }
     sidebarBackdrop.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); closeSidebar(); });
-
     window.addEventListener("resize", () => { if (window.innerWidth > 900) closeSidebar(); });
 
     // 左缘右划打开
@@ -1183,8 +1181,8 @@ function bindEvents(){
       chip.addEventListener("click", ()=>{
         const min=chip.getAttribute("data-min"), max=chip.getAttribute("data-max");
         const minEl = el("#cf-rating-min"); const maxEl = el("#cf-rating-max");
-        if (minEl) setPref("cf:random:ratingMin", (minEl.value = min || ""));
-        if (maxEl) setPref("cf:random:ratingMax", (maxEl.value = max || ""));
+        if (minEl) { minEl.value = min || ""; setPref("cf:random:ratingMin", minEl.value.trim()); }
+        if (maxEl) { maxEl.value = max || ""; setPref("cf:random:ratingMax", maxEl.value.trim()); }
       });
     });
 
@@ -1247,9 +1245,7 @@ function bindEvents(){
         const { problems } = await loadCFProblemset(false);
 
         let solvedSet = null;
-        if (excludeSolved && handle) {
-          solvedSet = await loadCFSolvedSet(handle);
-        }
+        if (excludeSolved && handle) solvedSet = await loadCFSolvedSet(handle);
 
         const picked = pickRandomCF(problems, { ratingMin, ratingMax, tags, count, requireRated, excludeSolved, solvedSet });
         if (!picked.length) { alert("没有匹配的题目，请调整筛选条件"); return; }
@@ -1275,40 +1271,13 @@ function bindEvents(){
   const emailInput = el("#auth-email");
   const passInput = el("#auth-password");
   const msgEl = el("#auth-msg");
-  const upBtn = el("#sync-upload-btn");
-  const downBtn = el("#sync-download-btn");
 
   const setMsg = (t, isErr=false) => { if (!msgEl) return; msgEl.textContent = t || ""; msgEl.style.color = isErr ? "var(--danger)" : "var(--muted)"; };
-  // OAuth 按钮
-  const oauthGithub = el("#oauth-github");
-  const oauthGoogle = el("#oauth-google");
-
-  // 统一的 OAuth 启动函数
-  const startOAuth = async (provider) => {
-    if (!supa) { alert("未配置 Supabase，无法登录。"); return; }
-    try {
-      const redirectTo = getRedirectTo(); // 已有函数，返回当前站点稳定回跳地址
-      // 触发 Supabase OAuth 流程
-      await supa.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo }
-      });
-    } catch (e) {
-      const msgEl = el("#auth-msg");
-      if (msgEl) { msgEl.textContent = "第三方登录失败"; msgEl.style.color = "var(--danger)"; }
-      console.error(e);
-    }
-  };
-
-  if (oauthGithub) oauthGithub.addEventListener("click", () => startOAuth("github"));
-  if (oauthGoogle) oauthGoogle.addEventListener("click", () => startOAuth("google"));
 
   if (loginBtn) {
     loginBtn.addEventListener("click", () => {
       const sidebar = el(".sidebar"); const backdrop = el("#sidebar-backdrop");
-      if (sidebar && backdrop && window.innerWidth <= 900 && sidebar.classList.contains("open")) {
-        sidebar.classList.remove("open"); backdrop.classList.remove("show");
-      }
+      if (sidebar && backdrop && window.innerWidth <= 900 && sidebar.classList.contains("open")) { sidebar.classList.remove("open"); backdrop.classList.remove("show"); }
       openAuthModal();
     });
   }
@@ -1344,15 +1313,81 @@ function bindEvents(){
   if (authSignup) authSignup.addEventListener("click", doSignup);
   if (passInput) passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 
-  // “更多”菜单
-  initMoreMenu();
+  // OAuth
+  const oauthGithub = el("#oauth-github");
+  const oauthGoogle = el("#oauth-google");
+  const startOAuth = async (provider) => {
+    if (!supa) { alert("未配置 Supabase，无法登录。"); return; }
+    try {
+      const redirectTo = getRedirectTo();
+      await supa.auth.signInWithOAuth({ provider, options: { redirectTo } });
+    } catch (e) {
+      setMsg("第三方登录失败", true);
+      console.error(e);
+    }
+  };
+  if (oauthGithub) oauthGithub.addEventListener("click", () => startOAuth("github"));
+  if (oauthGoogle) oauthGoogle.addEventListener("click", () => startOAuth("google"));
+
+  // 上传/下载按钮（供隐藏按钮和菜单共用）
+  const upBtn = el("#sync-upload-btn");
+  const downBtn = el("#sync-download-btn");
+  if (upBtn) upBtn.addEventListener("click", runSyncUpload);
+  if (downBtn) downBtn.addEventListener("click", runSyncDownload);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { closePopover(); closeTagsModal(); closeCFRandomModal(); closeAuthModal(); }
+  });
 }
 
-/* 工具函数 */
-function sanitizeFilename(s){ return String(s||"list").replace(/[\\/:*?"<>|]/g,"_").slice(0,60); }
-function inputEl(sel){ return document.querySelector(sel); }
+/* 侧栏可拖拽调宽 */
+function setupSidebarResizer() {
+  const handle = el("#sidebar-resizer");
+  const sidebar = el(".sidebar");
+  if (!handle || !sidebar) return;
 
-/* 渲染：列表侧栏与工具栏 */
+  const MIN_W = 240;
+  const getMaxW = () => Math.max(MIN_W, Math.min(600, Math.floor(window.innerWidth * 0.6)));
+  const applyW = (w) => document.documentElement.style.setProperty("--sidebar-w", `${w}px`);
+  const saveW = (w) => { try { localStorage.setItem(SIDEBAR_W_KEY, String(w)); } catch {} };
+  const getCurrentW = () => {
+    const v = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sidebar-w"), 10);
+    return Number.isFinite(v) ? v : Math.round(sidebar.getBoundingClientRect().width);
+  };
+  const clampW = (w) => Math.max(MIN_W, Math.min(getMaxW(), w));
+
+  try { const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || "", 10); if (Number.isFinite(saved)) applyW(clampW(saved)); } catch {}
+
+  let active = false, startX = 0, startW = 0;
+
+  const onMove = (e) => { if (!active) return; const dx = e.clientX - startX; const w = clampW(startW + dx); applyW(w); };
+  const onUp = () => {
+    if (!active) return;
+    active = false;
+    document.body.classList.remove("resizing");
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    const w = getCurrentW();
+    saveW(clampW(w));
+  };
+
+  handle.addEventListener("pointerdown", (e) => {
+    if (window.innerWidth <= 900) return;
+    e.preventDefault();
+    active = true; startX = e.clientX; startW = sidebar.getBoundingClientRect().width;
+    document.body.classList.add("resizing");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  });
+
+  window.addEventListener("resize", () => {
+    if (window.innerWidth <= 900) return;
+    const w = clampW(getCurrentW());
+    applyW(w); saveW(w);
+  });
+}
+
+/* 渲染：侧栏与工具栏 */
 function renderLists() {
   const wrap = el("#lists"); wrap.innerHTML = "";
   state.lists.forEach((l) => {
@@ -1390,15 +1425,16 @@ function renderAll(){ renderLists(); renderToolbar(); renderProblems(); }
 function init(){
   if (init.__ran) return;
   init.__ran = true;
-  initTheme();          // +++ 先应用主题，避免首次渲染闪烁
+  initTheme();              // 先应用主题，避免闪烁
   bindEvents();
-  setupSidebarResizer && setupSidebarResizer();
+  setupSidebarResizer();
   renderAll();
   initSupabase();
+  initMoreMenu();
+  initAutoUpdater();        // 定期更新检查与更新条
 }
 
-
-// DOM 已就绪
+// 启动
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);
 } else {

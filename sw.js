@@ -1,4 +1,5 @@
-const CACHE_NAME = "plm-cache-v6";
+// 提示：每次更新静态资源后请递增版本，或依赖页面端的定期检查触发更新
+const CACHE_NAME = "plm-cache-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -10,7 +11,7 @@ const ASSETS = [
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
-  self.skipWaiting();
+  // 不再 install 时直接跳过等待，交由页面决定何时激活新 SW（利于提示“有新版本”）
 });
 
 self.addEventListener("activate", (e) => {
@@ -42,4 +43,11 @@ self.addEventListener("fetch", (e) => {
       return new Response("Offline", { status: 503, statusText: "Offline" });
     }
   })());
+});
+
+// 接收客户端“立即更新”请求，跳过等待，立即激活新 SW
+self.addEventListener("message", (event) => {
+  if (event?.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
