@@ -1,5 +1,5 @@
 // 提示：每次更新静态资源后请递增版本，或依赖页面端的定期检查触发更新
-const CACHE_NAME = "plm-cache-v9";
+const CACHE_NAME = "plm-cache-v10";
 const ASSETS = [
   "./",
   "./index.html",
