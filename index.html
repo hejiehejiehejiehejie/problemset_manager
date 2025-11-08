@@ -41,6 +41,7 @@
 
         <div class="search">
           <input id="search-input" placeholder="搜索：标题 / 链接 / 难度 / 标签" aria-label="搜索题目" />
+          <button id="advanced-filter-btn" class="btn-ghost" title="高级筛选">筛选</button>
         </div>
 
         <div class="actions">
@@ -244,6 +245,52 @@
       </div>
     </div>
   </div>
+
+  <!-- 高级筛选 -->
+  <div id="filter-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="filter-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="filter-title">高级筛选</h2>
+        <button id="filter-close" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <div style="min-width:200px;">
+            <div class="small">难度最小</div>
+            <input id="f-diff-min" class="input-sm" type="number" placeholder="如 1200" />
+          </div>
+          <div style="min-width:200px;">
+            <div class="small">难度最大</div>
+            <input id="f-diff-max" class="input-sm" type="number" placeholder="如 1800" />
+          </div>
+          <div style="min-width:260px; flex:1;">
+            <div class="small">标签（AND，全部包含）</div>
+            <input id="f-tags-all" class="input-sm" placeholder="如 dp, graph" />
+          </div>
+          <div style="min-width:260px; flex:1;">
+            <div class="small">标签（OR，任一包含）</div>
+            <input id="f-tags-any" class="input-sm" placeholder="如 math, greedy" />
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <div class="small">来源站点</div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:6px;">
+            <label><input id="f-site-cf" type="checkbox" /> Codeforces</label>
+            <label><input id="f-site-at" type="checkbox" /> AtCoder</label>
+            <label><input id="f-site-luogu" type="checkbox" /> 洛谷</label>
+            <label><input id="f-site-other" type="checkbox" /> 其他</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div style="display:flex; gap:8px;">
+          <button id="filter-apply" class="btn-primary">应用</button>
+          <button id="filter-reset" class="btn-ghost">清空</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Supabase 客户端与配置：加 defer，且一定在 app.js 之前 -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
