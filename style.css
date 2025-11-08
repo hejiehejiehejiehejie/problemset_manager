@@ -218,6 +218,21 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   --scrollbar-thumb-hover: #afb8c1;
 }
 
+/* 登录/退出按钮样式 */
+#login-btn, #logout-btn {
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+  border-radius: 999px; padding: 4px 12px; height: 28px; font-size: 12px; line-height: 1;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+}
+#login-btn { border-color: rgba(56,139,253,0.6); color: #cfe5ff; }
+#login-btn:hover { background: rgba(56,139,253,0.12); border-color: var(--accent-2); color: #e8f2ff; }
+#login-btn:active { background: rgba(56,139,253,0.18); transform: translateY(1px); }
+#login-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(56,139,253,0.25); }
+#logout-btn { border-color: rgba(248,81,73,0.6); color: #ffd2cf; }
+#logout-btn:hover { background: rgba(248,81,73,0.12); border-color: var(--danger); color: #ffe7e5; }
+#logout-btn:active { background: rgba(248,81,73,0.18); transform: translateY(1px); }
+#logout-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(248,81,73,0.25); }
+
 /* 浅色：控件与细节修正 */
 [data-theme="light"] button { background: #f6f8fa; color: var(--text); border-color: var(--border); }
 [data-theme="light"] .actions .import-label { background: #f6f8fa; }
