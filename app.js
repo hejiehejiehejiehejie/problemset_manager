@@ -1279,6 +1279,29 @@ function bindEvents(){
   const downBtn = el("#sync-download-btn");
 
   const setMsg = (t, isErr=false) => { if (!msgEl) return; msgEl.textContent = t || ""; msgEl.style.color = isErr ? "var(--danger)" : "var(--muted)"; };
+  // OAuth 按钮
+  const oauthGithub = el("#oauth-github");
+  const oauthGoogle = el("#oauth-google");
+
+  // 统一的 OAuth 启动函数
+  const startOAuth = async (provider) => {
+    if (!supa) { alert("未配置 Supabase，无法登录。"); return; }
+    try {
+      const redirectTo = getRedirectTo(); // 已有函数，返回当前站点稳定回跳地址
+      // 触发 Supabase OAuth 流程
+      await supa.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo }
+      });
+    } catch (e) {
+      const msgEl = el("#auth-msg");
+      if (msgEl) { msgEl.textContent = "第三方登录失败"; msgEl.style.color = "var(--danger)"; }
+      console.error(e);
+    }
+  };
+
+  if (oauthGithub) oauthGithub.addEventListener("click", () => startOAuth("github"));
+  if (oauthGoogle) oauthGoogle.addEventListener("click", () => startOAuth("google"));
 
   if (loginBtn) {
     loginBtn.addEventListener("click", () => {
