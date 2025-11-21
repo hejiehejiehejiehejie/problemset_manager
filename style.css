@@ -106,7 +106,7 @@ button.danger { border-color: var(--danger); color: #ffd2cf; }
 /* 标签 */
 .tag-wrap { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .tag-wrap.centered { justify-content: center; }
-.tag-chip { display: inline-flex; align-items: center; margin: 2px 1px; gap: 5px; padding: 2px 10px; border-radius: 999px; background: #1a1f27; border: 1px solid #2b313a; color: var(--chip-text); font-size: 12px; }
+.tag-chip { display: inline-flex; align-items: center; margin: 1px; gap: 5px; padding: 2px 10px; border-radius: 999px; background: #1a1f27; border: 1px solid #2b313a; color: var(--chip-text); font-size: 12px; }
 .tag-chip .remove { cursor: pointer; color: var(--muted); }
 .add-tag-btn { display: inline-flex; justify-content: center; align-items: center; width: 24px; height: 24px; border-radius: 999px; border: 1px dashed var(--border); color: var(--muted); background: transparent; margin-left: 6px; font-size: 14px; }
 .add-tag-btn:hover { border-color: var(--accent-2); color: var(--accent-2); }
