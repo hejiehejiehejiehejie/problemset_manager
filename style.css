@@ -83,7 +83,7 @@ button:active { transform: translateY(1px); }
 button.danger { border-color: var(--danger); color: #ffd2cf; }
 .btn-ghost { background: transparent; border: 1px dashed var(--border); color: var(--muted); border-radius: 999px; }
 .btn-ghost:hover { border-color: var(--accent-2); color: var(--text); }
-.btn-primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+.btn-primary { margin-right: 1px; background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
 .btn-primary:hover { filter: brightness(1.06); }
 .btn-xs { padding: 2px 10px; font-size: 12px; line-height: 1.2; height: 26px; }
 .btn-xxs { padding: 2px 8px; font-size: 12px; height: 24px; line-height: 1; }
