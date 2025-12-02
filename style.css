@@ -37,6 +37,25 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
 .sidebar-header h1 { font-size: 16px; margin: 0; letter-spacing: .3px; }
 .sidebar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .sidebar-header button { background: var(--accent-2); color: #fff; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.brand {
+  display: flex;
+  align-items: center;   /* 垂直居中对齐图标和文字 */
+  gap: 4px;              /* 图标与文字间距，可根据需要调整 */
+}
+.brand-text {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text);
+  letter-spacing: .2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 窄屏可选择隐藏品牌文字，仅保留图标 */
+@media (max-width: 900px) {
+  .brand-text { display: none; }
+}
 
 /* 侧栏列表 */
 #lists { overflow: auto; padding: 8px; flex: 1 1 auto; min-height: 0; }
@@ -238,9 +257,12 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 #logout-btn:hover { background: rgba(248,81,73,0.12); border-color: var(--danger); color: #ffe7e5; }
 #logout-btn:active { background: rgba(248,81,73,0.18); transform: translateY(1px); }
 #logout-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(248,81,73,0.25); }
-
-/* 登录后：账号显示更淡更小 */
-#account-area .email.is-logged-in { color: var(--muted); font-size: 12px; }
+/* 登录后：账号显示 */
+#account-area .email {
+  display: none;
+  color: var(--muted); font-size: 12px; 
+}
+#account-area .email.is-logged-in {display: block; }
 
 /* 浅色：控件与细节修正 */
 [data-theme="light"] button { background: #f6f8fa; color: var(--text); border-color: var(--border); }
