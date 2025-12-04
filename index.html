@@ -18,7 +18,6 @@
           <span id="account-email" class="email">未登录</span>
         </div>
         <div class="sidebar-right">
-          
           <button id="add-list-btn" title="新增题单" aria-label="新增题单">＋</button>
         </div>
       </div>
@@ -32,47 +31,95 @@
     <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
 
     <main class="main" role="main">
+      <!-- 顶部工具栏（已按你的样式重构，仅此处变更） -->
       <div class="toolbar">
-        <div class="current-list">
-          <input id="list-name-input" placeholder="未命名题单" aria-label="题单名称" />
-          <button id="rename-list-btn" title="重命名">重命名</button>
-          <button id="delete-list-btn" class="danger" title="删除题单">删除</button>
+        <!-- 左侧：窄屏侧栏开关 + 题单标题 + 删除按钮 -->
+        <div class="toolbar-section toolbar-left">
+          <button id="sidebar-edge-open" class="icon-btn edge-open-btn edge-inline" title="打开侧栏" aria-label="打开侧栏">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          <div class="list-info-group">
+            <input id="list-name-input" class="seamless-input" placeholder="未命名题单" aria-label="题单名称" />
+            <button id="delete-list-btn" class="danger-icon-btn" title="删除当前题单">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a 2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div class="search">
-          <input id="search-input" placeholder="搜索：标题 / 链接 / 难度 / 标签" aria-label="搜索题目" />
-          <button id="advanced-filter-btn" class="btn-ghost" title="高级筛选">筛选</button>
+        <!-- 中间：搜索框 + 筛选按钮 -->
+        <div class="toolbar-section toolbar-center">
+          <div class="search-wrapper">
+            <span class="search-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            <input id="search-input" placeholder="搜索题目..." aria-label="搜索题目" />
+            <button id="advanced-filter-btn" class="filter-btn" title="高级筛选">
+              <!-- 搜索图标（替换） -->
+              <span class="search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </span>
+            </button>
+          </div>
         </div>
 
-        <div class="actions">
-          <button id="add-problem-btn">新增题目</button>
-          <button id="cf-random-btn" title="随机抽取 Codeforces 题目">随机CF</button>
+        <!-- 右侧：新增/随机操作 + 工具按钮 -->
+        <div class="toolbar-section toolbar-right">
+          <div class="action-group">
+            <button id="add-problem-btn" class="btn-primary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span class="btn-text">新增</span>
+            </button>
+            <button id="cf-random-btn" class="btn-ghost btn-sm" title="随机抽取 Codeforces 题目">
+              <span class="btn-text">随机CF</span>
+            </button>
+          </div>
 
-          <!-- 右侧对齐 -->
-          <span id="sync-status" class="sync-status" aria-live="polite" style="margin-left:auto;"></span>
-          <button id="theme-toggle" class="icon-btn" title="切换主题" aria-label="切换主题">☾</button>
-          <button id="toolbar-more-btn" class="icon-btn" title="更多" aria-label="更多">⋯</button>
+          <div class="divider-vertical"></div>
 
-          <!-- 隐藏的原控件（“更多”菜单复用其逻辑） -->
+          <div class="tool-group">
+            <span id="sync-status" class="sync-status" aria-live="polite"></span>
+            <button id="theme-toggle" class="icon-btn" title="切换主题">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </button>
+            <button id="toolbar-more-btn" class="icon-btn" title="更多">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="19" cy="12" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+              </svg>
+            </button>
+          </div>
+
+          <!-- 隐藏的原生按钮（保留供JS调用） -->
           <div class="hidden-actions">
-            <!-- 题单级 -->
-            <button id="export-list-btn" title="导出当前题单">导出题单</button>
-            <label class="import-label" title="导入单个题单">
-              导入题单
-              <input id="import-list-input" type="file" accept="application/json" />
-            </label>
-            <button id="manage-tags-btn" title="管理标签库">标签库</button>
-
-            <!-- 同步 -->
-            <button id="sync-upload-btn" title="将本地数据上传到云端（覆盖云端）">上传云端</button>
-            <button id="sync-download-btn" title="从云端下载数据（覆盖本地）">下载云端</button>
-
-            <!-- 全部数据 -->
+            <button id="rename-list-btn">重命名</button>
+            <button id="export-list-btn">导出题单</button>
+            <label class="import-label"><input id="import-list-input" type="file" accept="application/json" /></label>
+            <button id="manage-tags-btn">标签库</button>
+            <button id="sync-upload-btn">上传云端</button>
+            <button id="sync-download-btn">下载云端</button>
             <button id="export-btn">导出全部数据</button>
-            <label class="import-label">
-              导入全部数据
-              <input id="import-input" type="file" accept="application/json" />
-            </label>
+            <label class="import-label"><input id="import-input" type="file" accept="application/json" /></label>
           </div>
         </div>
       </div>
@@ -291,8 +338,7 @@
     </div>
   </div>
 
-
-  <!-- Supabase 客户端与配置：加 defer，且一定在 app.js 之前 -->
+  <!-- Supabase 客户端与配置：加 defer -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
   <script defer src="./supabase-config.js"></script>
   <script defer src="./app.js"></script>

@@ -4,6 +4,7 @@ const APP_VERSION = "1.0.0"; // 手动更新版本时可修改，便于诊断
 const STORAGE_KEY = "problem-lists:v1";
 const UNCATEGORIZED_NAME = "未分类";
 const SIDEBAR_W_KEY = "plm:sidebar-w";
+const SIDEBAR_COLLAPSED_KEY = "plm:sidebar:collapsed";
 const THEME_KEY = "plm:theme";
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
@@ -1262,14 +1263,38 @@ function bindEvents(){
   const edgeOpen = el("#sidebar-edge-open");
 
   if (sidebar && sidebarBackdrop) {
-    const openSidebar = () => { if (window.innerWidth > 900) return; sidebar.classList.add("open"); sidebarBackdrop.classList.add("show"); };
+    const openSidebar = () => { if (window.innerWidth > 400) return; sidebar.classList.add("open"); sidebarBackdrop.classList.add("show"); };
     const closeSidebar = () => { sidebar.classList.remove("open"); sidebarBackdrop.classList.remove("show"); };
 
     if (edgeOpen) {
-      const onOpen = (e) => { e.preventDefault(); e.stopPropagation(); openSidebar(); };
-      edgeOpen.addEventListener("click", onOpen);
-      edgeOpen.addEventListener("touchend", onOpen, { passive: false });
-    }
+    const onToggle = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isDesktop()) {
+        // 宽屏：切折叠
+        if (isSidebarCollapsed()) expandSidebarDesktop(
+          (w) => document.documentElement.style.setProperty("--sidebar-w", `${w}px`),
+          (w) => Math.max(240, Math.min(Math.max(240, Math.min(600, Math.floor(window.innerWidth * 0.6))), w)) // clampW inline
+        );
+        else collapseSidebarDesktop(
+          () => {
+            // getCurrentW inline
+            const v = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sidebar-w"), 10);
+            return Number.isFinite(v) ? v : Math.round(el(".sidebar").getBoundingClientRect().width);
+          },
+          (w) => { try { localStorage.setItem(SIDEBAR_W_KEY, String(w)); } catch {} }
+        );
+      } else {
+        // 窄屏：切抽屉
+        const openSidebar = () => { if (window.innerWidth > 900) return; sidebar.classList.add("open"); sidebarBackdrop.classList.add("show"); };
+        const closeSidebar = () => { sidebar.classList.remove("open"); sidebarBackdrop.classList.remove("show"); };
+        if (sidebar.classList.contains("open")) closeSidebar(); else openSidebar();
+      }
+    };
+    edgeOpen.addEventListener("click", onToggle);
+    edgeOpen.addEventListener("touchend", onToggle, { passive: false });
+  }
+
     sidebarBackdrop.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); closeSidebar(); });
     window.addEventListener("resize", () => { if (window.innerWidth > 900) closeSidebar(); });
 
@@ -1649,6 +1674,54 @@ function bindEvents(){
   });
 }
 
+function isDesktop() { return window.innerWidth > 900; }
+
+function isSidebarCollapsed() {
+  try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1"; } catch { return false; }
+}
+
+function setSidebarCollapsed(collapsed) {
+  if (collapsed) {
+    document.documentElement.setAttribute("data-sidebar", "collapsed");
+    try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, "1"); } catch {}
+  } else {
+    document.documentElement.removeAttribute("data-sidebar");
+    try { localStorage.removeItem(SIDEBAR_COLLAPSED_KEY); } catch {}
+  }
+}
+
+function collapseSidebarDesktop(getCurrentW, saveW) {
+  // 记住当前宽度，方便恢复
+  const lastW = typeof getCurrentW === "function" ? getCurrentW() : 280;
+  try { localStorage.setItem(SIDEBAR_W_KEY, String(lastW)); } catch {}
+  setSidebarCollapsed(true);
+}
+
+function expandSidebarDesktop(applyW, clampW) {
+  let w = 280;
+  try {
+    const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || "", 10);
+    if (Number.isFinite(saved)) w = saved;
+  } catch {}
+  const ww = typeof clampW === "function" ? clampW(w) : w;
+  if (typeof applyW === "function") applyW(ww);
+  setSidebarCollapsed(false);
+}
+
+function applyCollapsedOnLoad(applyW, clampW) {
+  if (!isDesktop()) return;
+  if (isSidebarCollapsed()) {
+    // 折叠态下无需设置宽度变量（布局用 CSS 覆盖），但展开时需要宽度可恢复
+    setSidebarCollapsed(true);
+  } else {
+    // 非折叠时，照常用上次宽度
+    try {
+      const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || "", 10);
+      if (Number.isFinite(saved) && typeof applyW === "function") applyW(clampW ? clampW(saved) : saved);
+    } catch {}
+  }
+}
+
 /* 侧栏可拖拽调宽 */
 function setupSidebarResizer() {
   const handle = el("#sidebar-resizer");
@@ -1665,36 +1738,57 @@ function setupSidebarResizer() {
   };
   const clampW = (w) => Math.max(MIN_W, Math.min(getMaxW(), w));
 
-  try { const saved = parseInt(localStorage.getItem(SIDEBAR_W_KEY) || "", 10); if (Number.isFinite(saved)) applyW(clampW(saved)); } catch {}
+  // 初始化时应用折叠/宽度
+  applyCollapsedOnLoad(applyW, clampW);
 
-  let active = false, startX = 0, startW = 0;
+  let active = false, startX = 0, startW = 0, lastRawW = 0;
 
-  const onMove = (e) => { if (!active) return; const dx = e.clientX - startX; const w = clampW(startW + dx); applyW(w); };
+  const onMove = (e) => {
+    if (!active) return;
+    const dx = e.clientX - startX;
+    lastRawW = startW + dx; // 未夹紧的原始宽度
+    const w = clampW(lastRawW);
+    // 若当前是折叠态，拖动不生效（隐藏了柄）；仅在宽屏且可见时才会进入此逻辑
+    if (!isSidebarCollapsed()) applyW(w);
+  };
+
   const onUp = () => {
     if (!active) return;
     active = false;
     document.body.classList.remove("resizing");
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
+
+    // 宽屏：在“极左”并且用户明显继续往左拖时，触发折叠
+    // 阈值：小于最小宽度 MIN_W 再额外 60px 的意图
+    if (isDesktop() && lastRawW < (MIN_W * 0.2)) {
+      collapseSidebarDesktop(getCurrentW, saveW);
+      return;
+    }
+
+    // 否则保存当前宽度
     const w = getCurrentW();
     saveW(clampW(w));
   };
 
   handle.addEventListener("pointerdown", (e) => {
-    if (window.innerWidth <= 900) return;
+    if (!isDesktop()) return; // 窄屏不允许拖栏宽度
+    if (isSidebarCollapsed()) return; // 折叠态无效
     e.preventDefault();
-    active = true; startX = e.clientX; startW = sidebar.getBoundingClientRect().width;
+    active = true; startX = e.clientX; startW = sidebar.getBoundingClientRect().width; lastRawW = startW;
     document.body.classList.add("resizing");
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   });
 
   window.addEventListener("resize", () => {
-    if (window.innerWidth <= 900) return;
+    if (!isDesktop()) return;
+    if (isSidebarCollapsed()) return; // 折叠态下保持 0 列布局
     const w = clampW(getCurrentW());
     applyW(w); saveW(w);
   });
 }
+
 
 /* 渲染：侧栏与工具栏 */
 function renderLists() {
@@ -1750,20 +1844,77 @@ function openAuthModal(){
 }
 function closeAuthModal(){ const n=el("#auth-modal"); if(n) n.classList.add("hidden"); }
 
+function initCompactSearch() {
+  const wrap = document.querySelector('.toolbar .search-wrapper');
+  const input = document.querySelector('#search-input');
+  if (!wrap || !input) return;
+
+  const open = () => {
+    if (wrap.classList.contains('is-open')) return;
+    wrap.classList.add('is-open');
+    // 让输入框可聚焦、并选择现有文本
+    requestAnimationFrame(() => { input.focus(); try { input.select(); } catch {} });
+  };
+  const close = () => {
+    if (!wrap.classList.contains('is-open')) return;
+    wrap.classList.remove('is-open');
+    input.blur();
+  };
+
+  // 点击容器任意处展开
+  wrap.addEventListener('click', (e) => {
+    // 若已展开则不拦截正常点击（例如点击筛选按钮）
+    if (!wrap.classList.contains('is-open')) {
+      e.preventDefault();
+      open();
+    }
+  });
+
+  // Esc 收起
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+
+  // 点外部收起
+  document.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target)) close();
+  });
+
+  // 快捷键：/ 或 Ctrl/Cmd+K 打开搜索（在未输入表单时）
+  document.addEventListener('keydown', (e) => {
+    const ae = document.activeElement;
+    const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
+    if (typing) return;
+
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      open();
+    } else if ((e.key.toLowerCase() === 'k') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      open();
+    }
+  });
+}
+
+
 /* 初始化 */
 function renderAll(){ renderLists(); renderToolbar(); renderProblems(); }
 
-function init(){
+function init() {
   if (init.__ran) return;
   init.__ran = true;
-  initTheme();              // 先应用主题，避免闪烁
+  initTheme();
   bindEvents();
   setupSidebarResizer();
   renderAll();
   initSupabase();
   initMoreMenu();
-  initAutoUpdater();        // 定期更新检查与更新条
+  initAutoUpdater();
+
+  // 新增：让搜索默认收起，点击/快捷键时再展开
+  initCompactSearch();
 }
+
 
 // 启动
 if (document.readyState === "loading") {

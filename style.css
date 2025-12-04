@@ -71,7 +71,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
 /* 顶部工具栏 */
 .toolbar { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--panel); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
 .current-list { display: flex; gap: 8px; align-items: center; min-width: 300px; flex: 1 1 420px; }
-#list-name-input { flex: 1 1 200px; min-width: 160px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
+#list-name-input { flex: 1 1 200px; min-width: 160px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-weight: normal; font-size: 16px; }
 .search { display: flex; gap: 8px; align-items: center; flex: 1 1 380px; min-width: 240px; }
 .search input { flex: 1; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
 .actions { display: flex; gap: 12px; align-items: center; flex: 1 1 100%; width: 100%; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; scrollbar-gutter: stable; }
@@ -451,5 +451,335 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   .problems-table tbody tr td[colspan]::before {
     content: none !important;           /* 去掉左侧伪标签占位 */
     display: none !important;
+  }
+}
+/* ===== Toolbar-only overrides (match the provided design) ===== */
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 24px;
+  height: 64px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  flex-shrink: 0;
+}
+
+.toolbar-section { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.toolbar-left { justify-content: flex-start; }
+.toolbar-center { justify-content: center; min-width: 0; }
+.toolbar-right { justify-content: flex-end; }
+
+/* 标题输入与删除 */
+.toolbar .list-info-group { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.toolbar .seamless-input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: 6px;
+  width: clamp(160px, 28vw, 260px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: all .2s ease;
+}
+.toolbar .seamless-input:hover { background: var(--input-bg); border-color: var(--border); }
+.toolbar .seamless-input:focus { background: var(--input-bg); border-color: var(--accent-2); outline: none; }
+
+.toolbar .danger-icon-btn,
+.toolbar .icon-btn {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent; border-radius: 8px;
+  color: var(--muted);
+  padding: 0; box-shadow: none;
+  transition: color .15s ease, background-color .15s ease, border-color .15s ease, transform .05s ease;
+}
+.toolbar .icon-btn:hover { color: var(--text); background: rgba(125,125,125,0.1); }
+.toolbar .danger-icon-btn { opacity: .7; }
+.toolbar .danger-icon-btn:hover { opacity: 1; color: var(--danger); background: rgba(248,81,73,0.10); }
+
+/* 搜索 */
+.toolbar .search-wrapper {
+  display: flex; align-items: center;
+  width: 100%; max-width: 560px; min-width: 0;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 4px 6px 4px 16px;
+  transition: all .2s ease;
+}
+.toolbar .search-wrapper:focus-within {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 3px rgba(56,139,253,0.15);
+}
+.toolbar .search-icon { color: var(--muted); display: flex; align-items: center; }
+.toolbar .search-wrapper input {
+  flex: 1; min-width: 50px;
+  border: none; background: transparent; outline: none;
+  height: 32px; margin: 0 8px; color: var(--text); font-size: 14px;
+}
+.toolbar .filter-btn {
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent; border-radius: 50%;
+  color: var(--muted); cursor: pointer;
+  transition: color .15s ease, background-color .15s ease, border-color .15s ease, transform .05s ease;
+}
+.toolbar .filter-btn:hover { background: rgba(125,125,125,0.1); color: var(--text); }
+
+/* 右侧操作组 */
+.toolbar .action-group { display: flex; gap: 8px; flex-wrap: nowrap; }
+.toolbar .tool-group { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.toolbar .divider-vertical { width: 1px; height: 20px; background: var(--border); margin: 0 8px; flex: 0 0 auto; }
+
+.toolbar .action-group .btn-sm {
+  height: 32px; padding: 0 16px;
+  font-size: 13px; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); white-space: nowrap;
+}
+.toolbar .action-group .btn-primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+.toolbar .action-group .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 2px 8px rgba(56,139,253,0.3); }
+.toolbar .action-group .btn-ghost { background: transparent; border-style: dashed; color: var(--muted); }
+.toolbar .action-group .btn-ghost:hover { border-color: var(--accent-2); color: var(--text); border-style: solid; }
+
+.toolbar #sync-status { max-width: 24ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 汉堡：桌面隐藏，窄屏显示 */
+.toolbar .edge-open-btn.edge-inline { display: none; }
+@media (max-width: 900px) {
+  .toolbar { gap: 12px; height: 56px; padding: 0 12px; }
+  .toolbar .edge-open-btn.edge-inline { display: inline-flex; margin-right: 4px; }
+  .toolbar .seamless-input { width: clamp(110px, 26vw, 180px); font-size: 16px; }
+  .toolbar .action-group .btn-sm .btn-text { display: none; } /* 收起文字防溢出 */
+  .toolbar .action-group { gap: 8px; }
+  .toolbar .tool-group { gap: 6px; }
+}
+
+/* 极小屏进一步压缩 */
+@media (max-width: 600px) {
+  .toolbar #sync-status { display: none; }
+  .toolbar .search-icon { display: none; }
+  .toolbar .search-wrapper { padding-left: 12px; }
+}
+/* 让 toolbar 始终在抽屉遮罩之上，保证可点 */
+.toolbar {
+  z-index: 1300; /* 大于 #sidebar-backdrop 的 1190；仍低于 .popover(1500)/.modal(2000) */
+}
+
+/* 防止点击命中到按钮里的 svg 导致外部点击被误判：让事件落到 button 本身 */
+.toolbar .icon-btn > svg,
+.toolbar .danger-icon-btn > svg,
+.toolbar .filter-btn > svg,
+.toolbar .btn-sm > svg {
+  pointer-events: none;
+}
+/* Toolbar：题单重命名输入框无边框 */
+.toolbar .seamless-input {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  caret-color: var(--text); /* 透明背景下保证光标可见 */
+}
+
+/* 保持 hover / focus 时也无边框、无高亮 */
+.toolbar .seamless-input:hover,
+.toolbar .seamless-input:focus {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+/* 宽屏：折叠态布局（不改变原有 min/max 限制，只在折叠时接管布局） */
+@media (min-width: 901px) {
+  html[data-sidebar="collapsed"] #app {
+    grid-template-columns: 0 1fr;
+  }
+  html[data-sidebar="collapsed"] .sidebar {
+    min-width: 0 !important;
+    width: 0 !important;
+    overflow: hidden;
+    border-right: 0;
+  }
+  html[data-sidebar="collapsed"] .sidebar-resizer {
+    display: none !important;
+  }
+  /* 折叠时在宽屏显示汉堡按钮（沿用窄屏汉堡的样式） */
+  html[data-sidebar="collapsed"] .edge-open-btn.edge-inline {
+    display: inline-flex !important;
+  }
+}
+
+/* 让 toolbar 始终在抽屉遮罩之上（避免按钮被遮住），不影响 popover/modal */
+.toolbar { z-index: 1300; }
+
+/* 避免点击落在 svg 而导致“外部点击”误判收起 popover */
+.toolbar .icon-btn > svg,
+.toolbar .danger-icon-btn > svg,
+.toolbar .filter-btn > svg,
+.toolbar .btn-sm > svg {
+  pointer-events: none;
+}
+/* Toolbar 搜索：默认收起，聚焦/展开时再显示输入框 */
+.toolbar .search-wrapper {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  transition: background-color .15s ease, border-color .15s ease, padding .15s ease;
+}
+
+/* 收起态：更低存在感、无边框、仅图标+筛选钮 */
+.toolbar .search-wrapper:not(.is-open):not(:focus-within) {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 0 6px;
+}
+
+/* 收起态下隐藏输入框（占位为 0） */
+.toolbar .search-wrapper:not(.is-open):not(:focus-within) input {
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+  transition: width .16s ease, opacity .12s ease;
+}
+
+/* 展开态：恢复为原来的小胶囊输入 */
+.toolbar .search-wrapper.is-open,
+.toolbar .search-wrapper:focus-within {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  padding: 4px 6px 4px 12px;
+}
+
+/* 展开态下输入框显示并可输入 */
+.toolbar .search-wrapper.is-open input,
+.toolbar .search-wrapper:focus-within input {
+  width: clamp(160px, 28vw, 320px);
+  opacity: 1;
+  margin: 0 8px;
+  padding: 0;
+  pointer-events: auto;
+}
+
+/* 提示文字：收起时不显示，展开后再显示 */
+.toolbar .search-wrapper:not(.is-open):not(:focus-within) input::placeholder { opacity: 0; }
+.toolbar .search-wrapper.is-open input::placeholder,
+.toolbar .search-wrapper:focus-within input::placeholder { opacity: .9; }
+
+/* 筛选按钮保持可点击，弱化到需要时再用 */
+.toolbar .filter-btn { width: 28px; height: 28px; color: var(--muted); }
+.toolbar .filter-btn:hover { color: var(--text); background: rgba(125,125,125,0.10); }
+
+/* 窄屏展开宽度略收紧，避免溢出 */
+@media (max-width: 900px) {
+  .toolbar .search-wrapper.is-open input,
+  .toolbar .search-wrapper:focus-within input {
+    width: clamp(140px, 46vw, 240px);
+  }
+}
+/* Toolbar：更紧凑的垂直间距（仅作用于 toolbar） */
+.toolbar {
+  height: 52px;              /* 原 64px → 52px */
+  padding: 0 16px;           /* 原 0 24px → 0 16px */
+  gap: 16px;                 /* 原 24px → 16px */
+}
+
+/* 统一控件高度，保持基线对齐 */
+.toolbar .icon-btn,
+.toolbar .danger-icon-btn {
+  width: 28px;
+  height: 28px;              /* 原 32 → 28 */
+}
+.toolbar .filter-btn {
+  width: 24px;
+  height: 24px;              /* 原 28 → 24 */
+}
+.toolbar .action-group .btn-sm {
+  height: 28px;              /* 原 32 → 28 */
+  line-height: 28px;
+  padding: 0 12px;           /* 原 0 16px → 0 12px */
+}
+
+/* 标题输入更紧凑但不失可点面积 */
+.toolbar .seamless-input {
+  padding: 4px 6px;          /* 原 6px 8px → 4px 6px */
+  font-size: 17px;           /* 略收紧 */
+}
+
+/* 搜索区域（兼容收起/展开两态） */
+.toolbar .search-wrapper {
+  border-radius: 999px;
+}
+.toolbar .search-wrapper.is-open,
+.toolbar .search-wrapper:focus-within {
+  padding: 3px 6px 3px 10px;  /* 原 4px.. → 3px .. */
+}
+.toolbar .search-wrapper input {
+  height: 28px;               /* 原 32 → 28 */
+  margin: 0 6px;              /* 原 8 → 6 */
+  font-size: 13.5px;          /* 略收紧 */
+}
+
+/* 右侧分隔竖线略缩短以匹配整体高度 */
+.toolbar .divider-vertical {
+  height: 18px;               /* 原 20 → 18 */
+  margin: 0 6px;              /* 原 0 8 → 0 6 */
+}
+
+/* 窄屏进一步压缩 */
+@media (max-width: 900px) {
+  .toolbar {
+    height: 48px;             /* 原 56 → 48 */
+    padding: 0 10px;          /* 原 0 12 → 0 10 */
+    gap: 10px;                /* 原 12 → 10 */
+  }
+  .toolbar .seamless-input {
+    font-size: 15px;
+    width: clamp(100px, 26vw, 160px);
+  }
+  .toolbar .action-group .btn-sm {
+    height: 26px;
+    line-height: 26px;
+    padding: 0 10px;
+  }
+  .toolbar .icon-btn,
+  .toolbar .danger-icon-btn {
+    width: 26px;
+    height: 26px;
+  }
+  .toolbar .filter-btn {
+    width: 22px;
+    height: 22px;
+  }
+  .toolbar .search-wrapper.is-open,
+  .toolbar .search-wrapper:focus-within {
+    padding: 2px 6px 2px 10px;
+  }
+  .toolbar .search-wrapper input {
+    height: 26px;
+    margin: 0 6px;
+    font-size: 13px;
+  }
+}
+
+/* 极小屏再收一点 */
+@media (max-width: 600px) {
+  .toolbar {
+    height: 46px;             /* 原 56 → 46 */
+    gap: 8px;
+    padding: 0 8px;
   }
 }
