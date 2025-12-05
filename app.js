@@ -547,16 +547,41 @@ function closePopover() {
 }
 function outsideClickOnce(e){ if(currentPopover && !currentPopover.contains(e.target) && e.target !== currentPopoverAnchor) closePopover(); }
 function positionPopover(pop, anchorEl) {
-  const rect=anchorEl.getBoundingClientRect();
-  let top=rect.bottom+window.scrollY+6;
-  let left=rect.left+window.scrollX;
-  const vw = window.innerWidth, vh = window.innerHeight;
-  const pw = pop.offsetWidth || 360;
-  const ph = pop.offsetHeight || 240;
-  if (left + pw > window.scrollX + vw - 8) left = Math.max(window.scrollX + 8, window.scrollX + vw - pw - 8);
-  if (top + ph > window.scrollY + vh - 8) top = Math.max(window.scrollY + 8, rect.top + window.scrollY - ph - 6);
-  pop.style.top=`${top}px`; pop.style.left=`${left}px`;
+  const rect = anchorEl.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  
+  // 必须先显示出来才能获取 offsetWidth/Height，但要保持透明以避免闪烁
+  // CSS 中已默认 opacity: 0
+  
+  const pw = pop.offsetWidth || 320;
+  const ph = pop.offsetHeight || 200;
+
+  // 默认位置：按钮正下方，左对齐
+  let top = rect.bottom + window.scrollY + 8;
+  let left = rect.left + window.scrollX;
+  let originY = "top";
+  let originX = "left";
+
+  // 水平碰撞检测：如果右侧溢出，则尝试右对齐
+  if (left + pw > window.scrollX + vw - 12) {
+    left = Math.max(window.scrollX + 12, rect.right + window.scrollX - pw);
+    originX = "right";
+  }
+
+  // 垂直碰撞检测：如果下方溢出，则放上方
+  if (top + ph > window.scrollY + vh - 12) {
+    top = Math.max(window.scrollY + 12, rect.top + window.scrollY - ph - 8);
+    originY = "bottom";
+  }
+
+  pop.style.top = `${top}px`;
+  pop.style.left = `${left}px`;
+  
+  // 设置动画原点，使弹窗仿佛从按钮中长出来
+  pop.style.transformOrigin = `${originY} ${originX}`;
 }
+
 function positionPopoverVerticalOnly(pop, anchorEl) {
   const rect = anchorEl.getBoundingClientRect();
   let top = rect.bottom + window.scrollY + 6;
@@ -580,18 +605,32 @@ function onWindowResize(){
   positionPopover(currentPopover, currentPopoverAnchor);
 }
 function togglePopover(anchorEl, builder) {
-  if (currentPopover && currentPopoverAnchor === anchorEl) { closePopover(); return; }
+  if (currentPopover && currentPopoverAnchor === anchorEl) {
+    closePopover();
+    return;
+  }
   if (currentPopover) closePopover();
+
   const pop = builder();
   document.body.appendChild(pop);
+  
   currentPopover = pop;
   currentPopoverAnchor = anchorEl;
+
+  // 1. 定位
   positionPopover(pop, anchorEl);
-  setTimeout(()=>{
+
+  // 2. 触发动画：强制重绘后添加类名
+  requestAnimationFrame(() => {
+    pop.classList.add("anim-enter");
+  });
+
+  // 3. 绑定事件
+  setTimeout(() => {
     document.addEventListener("click", outsideClickOnce, { capture: true });
     window.addEventListener("resize", onWindowResize);
     window.addEventListener("scroll", onWindowScroll, true);
-  });
+  }, 0);
 }
 
 /* 右键菜单（新增）：通用菜单 + 剪贴板 */
@@ -654,27 +693,45 @@ function buildSimpleMenu(items) {
 function openContextMenuAt(pageX, pageY, items) {
   closePopover();
   const pop = buildSimpleMenu(items);
-  pop.classList.add("context-menu"); // 仅右键菜单使用
+  pop.classList.add("context-menu"); // 应用紧凑样式
   document.body.appendChild(pop);
 
-  // 视口内定位 + 鼠标轻微偏移 + 四周留白
   const vw = window.innerWidth, vh = window.innerHeight;
   const sx = window.scrollX, sy = window.scrollY;
-  const pad = 8;   // 距离视窗边缘
-  const ofs = 6;   // 鼠标偏移
-  const w = pop.offsetWidth, h = pop.offsetHeight;
+  const pad = 12;
+  
+  // 初始获取尺寸
+  const w = pop.offsetWidth || 200;
+  const h = pop.offsetHeight || 100;
 
-  let left = pageX + ofs;
-  let top  = pageY + ofs;
-  if (left + w > sx + vw - pad) left = Math.max(sx + pad, sx + vw - w - pad);
-  if (top  + h > sy + vh - pad) top  = Math.max(sy + pad,  sy + vh - h - pad);
+  let left = pageX + 2;
+  let top = pageY + 2;
+  let originX = "left";
+  let originY = "top";
 
-  pop.style.position = "absolute";
+  // 右侧溢出检测
+  if (left + w > sx + vw - pad) {
+    left = pageX - w - 2;
+    originX = "right";
+  }
+  // 底部溢出检测
+  if (top + h > sy + vh - pad) {
+    top = pageY - h - 2;
+    originY = "bottom";
+  }
+
   pop.style.left = left + "px";
-  pop.style.top  = top  + "px";
+  pop.style.top = top + "px";
+  pop.style.transformOrigin = `${originY} ${originX}`;
 
   currentPopover = pop;
   currentPopoverAnchor = null;
+
+  // 触发动画
+  requestAnimationFrame(() => {
+    pop.classList.add("anim-enter");
+  });
+
   setTimeout(() => {
     document.addEventListener("click", outsideClickOnce, { capture: true });
     window.addEventListener("resize", () => closePopover());
@@ -844,74 +901,162 @@ function sanitizeFilename(s){ return String(s||"list").replace(/[\\/:*?"<>|]/g,"
 /* 标签库管理面板 */
 function openTagsModal(){ el("#tags-modal").classList.remove("hidden"); renderTagManager(); }
 function closeTagsModal(){ el("#tags-modal").classList.add("hidden"); }
-function renderTagManager(){
-  const wrap=el("#taglib-cats"); if (!wrap) return; wrap.innerHTML="";
-  const cats=getCategories() || []; if (!cats.length) ensureTagLibrary(state);
+/* 标签库管理面板渲染 (重构版) */
+function renderTagManager() {
+  const wrap = document.querySelector("#taglib-cats");
+  if (!wrap) return;
+  wrap.innerHTML = "";
 
-  cats.forEach((c)=>{
-    const box=document.createElement("div"); box.className="lib-cat";
-    const head=document.createElement("div"); head.className="lib-cat-head";
-    const nameLabel=document.createElement("span"); nameLabel.textContent=c.name; nameLabel.style.fontWeight="600";
-    const spacer=document.createElement("div"); spacer.className="spacer";
-    const delCatBtn=document.createElement("button"); delCatBtn.textContent="×"; delCatBtn.title=`删除分类：${c.name}`; delCatBtn.className="danger";
-    delCatBtn.style.width="28px"; delCatBtn.style.height="28px"; delCatBtn.style.padding="0";
-    delCatBtn.addEventListener("click", ()=>{
+  const cats = getCategories() || [];
+  if (!cats.length) ensureTagLibrary(state);
+
+  cats.forEach((c) => {
+    // 1. 创建卡片容器
+    const card = document.createElement("div");
+    card.className = "lib-cat";
+
+    // 2. 创建头部 (标题 + 删除分类按钮)
+    const head = document.createElement("div");
+    head.className = "lib-cat-head";
+    
+    const title = document.createElement("span");
+    title.className = "lib-cat-name";
+    title.textContent = c.name;
+    
+    const delCatBtn = document.createElement("button");
+    delCatBtn.className = "icon-btn danger";
+    delCatBtn.title = "删除此分类";
+    // SVG 图标：垃圾桶
+    delCatBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a 2 2 0 0 1 2 2v2"></path></svg>';
+    
+    delCatBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
       if (c.name === UNCATEGORIZED_NAME) { alert("不能删除「未分类」"); return; }
-      if (!confirm(`删除分类「${c.name}」？其中标签将移动到「${UNCATEGORIZED_NAME}」`)) return;
-      deleteCategory(c.id); renderTagManager(); renderProblems();
+      if (!confirm(`确定删除分类「${c.name}」？内部标签将移动到未分类。`)) return;
+      deleteCategory(c.id);
+      renderTagManager();
+      renderProblems(); // 刷新主界面可能受影响的标签
     });
-    head.appendChild(nameLabel); head.appendChild(spacer); head.appendChild(delCatBtn);
 
-    const body=document.createElement("div"); body.className="lib-cat-body";
-    const tagList=document.createElement("div"); tagList.className="lib-chip-list";
+    head.appendChild(title);
+    head.appendChild(delCatBtn);
+
+    // 3. 创建主体 (标签列表 + 添加栏)
+    const body = document.createElement("div");
+    body.className = "lib-cat-body";
+
+    // 3.1 标签列表
+    const chipList = document.createElement("div");
+    chipList.className = "lib-chip-list";
+    
     const tagsSafe = Array.isArray(c.tags) ? c.tags : [];
-    tagsSafe.forEach((t)=>{
-      const chip=document.createElement("span"); chip.className="lib-chip";
-      const nameSpan=document.createElement("span"); nameSpan.textContent=String(t||"");
-      const x=document.createElement("button"); x.textContent="×"; x.title=`删除标签：${t}`; x.className="chip-del danger";
-      x.addEventListener("click",(e)=>{
-        e.stopPropagation();
-        if(!confirm(`从库中删除标签「${t}」？（不会影响题目上已有的同名标签）`)) return;
-        deleteTag(c.id,t); renderTagManager(); renderProblems();
-      });
-      chip.appendChild(nameSpan); chip.appendChild(x); tagList.appendChild(chip);
-    });
-
-    const controls=document.createElement("div"); controls.className="lib-controls";
-    function renderAddButton(){
-      controls.innerHTML="";
-      const addBtn=document.createElement("button"); addBtn.textContent="添加标签"; addBtn.className="btn-xxs";
-      addBtn.addEventListener("click", showAddInput);
-      controls.appendChild(addBtn);
+    if (tagsSafe.length === 0) {
+        const empty = document.createElement("div");
+        empty.style.color = "var(--muted)";
+        empty.style.fontSize = "12px";
+        empty.style.fontStyle = "italic";
+        empty.textContent = "暂无标签";
+        chipList.appendChild(empty);
+    } else {
+        tagsSafe.forEach((t) => {
+            const chip = document.createElement("span");
+            chip.className = "lib-chip";
+            
+            const txt = document.createElement("span");
+            txt.textContent = t;
+            
+            const delTag = document.createElement("button");
+            delTag.className = "chip-del";
+            delTag.innerHTML = "×";
+            delTag.title = "删除标签";
+            delTag.addEventListener("click", () => {
+                if (!confirm(`确定删除标签「${t}」？`)) return;
+                deleteTag(c.id, t);
+                renderTagManager();
+                renderProblems();
+            });
+            
+            chip.appendChild(txt);
+            chip.appendChild(delTag);
+            chipList.appendChild(chip);
+        });
     }
-    function showAddInput(){
-      controls.innerHTML="";
-      const inputEl=document.createElement("input"); inputEl.type="text"; inputEl.placeholder=`在「${c.name}」新增标签后回车`; inputEl.classList.add("input-sm"); inputEl.style.maxWidth="260px";
-      const okBtn=document.createElement("button"); okBtn.textContent="确定"; okBtn.className="btn-primary btn-xxs";
-      const cancelBtn=document.createElement("button"); cancelBtn.textContent="取消"; cancelBtn.className="btn-xxs";
-      okBtn.addEventListener("click",()=>{
-        const v=(inputEl.value||"").trim(); if(!v){ inputEl.focus(); return; }
-        if (!addTagToCategory(c.id,v)) { alert("新增失败：标签名为空"); return; }
-        renderTagManager(); renderProblems();
-      });
-      cancelBtn.addEventListener("click", renderAddButton);
-      inputEl.addEventListener("keydown",(e)=>{
-        if (e.key==="Enter") { e.preventDefault(); okBtn.click(); }
-        else if (e.key==="Escape") { e.preventDefault(); renderAddButton(); }
-      });
-      controls.appendChild(inputEl); controls.appendChild(okBtn); controls.appendChild(cancelBtn);
-      setTimeout(()=>inputEl.focus(),0);
-    }
-    renderAddButton();
 
-    body.appendChild(tagList); body.appendChild(controls);
-    box.appendChild(head); box.appendChild(body); wrap.appendChild(box);
+    // 3.2 添加栏 (交互优化)
+    const controls = document.createElement("div");
+    controls.className = "lib-controls";
+    
+    // 默认显示 "添加" 按钮
+    const initAddState = () => {
+        controls.innerHTML = "";
+        const addBtn = document.createElement("button");
+        addBtn.className = "btn-ghost btn-xs";
+        addBtn.textContent = "+ 添加标签";
+        addBtn.style.width = "100%"; // 宽按钮方便点击
+        addBtn.style.borderStyle = "dashed";
+        
+        addBtn.addEventListener("click", () => {
+            controls.innerHTML = ""; // 清空按钮
+            
+            const wrapper = document.createElement("div");
+            wrapper.style.display = "flex";
+            wrapper.style.gap = "6px";
+            wrapper.style.width = "100%";
+            
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className = "input-sm";
+            input.placeholder = "输入名称回车";
+            
+            // 自动聚焦
+            setTimeout(() => input.focus(), 0);
+            
+            const confirmAdd = () => {
+                const v = input.value.trim();
+                if (!v) { initAddState(); return; } // 空值则还原
+                if (addTagToCategory(c.id, v)) {
+                    renderTagManager();
+                    renderProblems();
+                } else {
+                    alert("添加失败：可能标签名为空或已存在");
+                    input.select();
+                }
+            };
+
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") confirmAdd();
+                if (e.key === "Escape") initAddState();
+            });
+            input.addEventListener("blur", () => {
+                // 失去焦点时，如果内容为空则还原，否则不动作（防止误触）
+                if(!input.value.trim()) initAddState(); 
+            });
+            
+            wrapper.appendChild(input);
+            controls.appendChild(wrapper);
+        });
+        controls.appendChild(addBtn);
+    };
+    initAddState();
+
+    body.appendChild(chipList);
+    body.appendChild(controls);
+
+    card.appendChild(head);
+    card.appendChild(body);
+    wrap.appendChild(card);
   });
 
-  enableDragSort(wrap, ".lib-cat", (from, to)=>{
-    const arr=state.tagLibrary.categories.slice(); const [moved]=arr.splice(from,1);
-    const insertAt=Math.max(0,Math.min(to,arr.length));
-    arr.splice(insertAt,0,moved); state.tagLibrary.categories=arr; persist(); renderTagManager(); renderProblems();
+  // 启用拖拽排序
+  enableDragSort(wrap, ".lib-cat", (from, to) => {
+    const arr = state.tagLibrary.categories.slice();
+    const [moved] = arr.splice(from, 1);
+    const insertAt = Math.max(0, Math.min(to, arr.length));
+    arr.splice(insertAt, 0, moved);
+    state.tagLibrary.categories = arr;
+    persist();
+    renderTagManager();
+    renderProblems();
   });
 }
 
@@ -1511,52 +1656,97 @@ function bindEvents(){
     if (handleEl) handleEl.addEventListener("change", () => setPref(CF_PREF_KEYS.handle, handleEl.value.trim()));
     if (exSolvedEl) exSolvedEl.addEventListener("change", () => setPref(CF_PREF_KEYS.excludeSolved, exSolvedEl.checked ? "1" : "0"));
 
-    el("#cf-random-run").addEventListener("click", async ()=>{
-      try {
-        saveCFRandomPrefsFromForm();
-        const list=getActiveList(); if(!list){ alert("请先创建或选择一个题单"); return; }
-        const ratingMinRaw=el("#cf-rating-min").value.trim();
-        const ratingMaxRaw=el("#cf-rating-max").value.trim();
-        const tagsRaw=el("#cf-tags").value.trim();
-        const countRaw=el("#cf-count").value.trim();
-        const includeTags=!!el("#cf-include-tags").checked;
+    // app.js - 找到 el("#cf-random-run") 的事件监听器
 
-        const handle = (el("#cf-handle")?.value || "").trim();
-        const excludeSolved = !!el("#cf-exclude-solved")?.checked;
+el("#cf-random-run").addEventListener("click", async (event) => {
+  // 获取按钮元素
+  const runButton = event.currentTarget;
+  if (!runButton) return;
 
-        if (excludeSolved) {
-          if (!handle) { alert("已勾选“排除已AC”，请填写 CF 账号"); return; }
-          const st = await validateCFHandle(handle);
-          if (!st.ok) {
-            alert(st.reason === "not_found" ? "CF 账号不存在，请检查" : "网络错误，稍后再试");
-            return;
-          }
-        }
+  // 1. 启动加载状态
+  runButton.classList.add("btn-loading");
+  // 保存原始文本
+  const originalText = runButton.textContent;
+  runButton.textContent = "抽取中..."; // 也可以保留为空
 
-        const ratingMin=ratingMinRaw?Number(ratingMinRaw):null;
-        const ratingMax=ratingMaxRaw?Number(ratingMaxRaw):null;
-        const requireRated = (ratingMin!=null || ratingMax!=null);
-        const tags=tagsRaw?tagsRaw.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean):[];
-        const count=countRaw?Number(countRaw):1;
+  try {
+    // -----------------------------------------------------
+    // 这里是你原有的所有抽题逻辑，保持不变
+    // -----------------------------------------------------
+    saveCFRandomPrefsFromForm();
+    const list = getActiveList();
+    if (!list) {
+      alert("请先创建或选择一个题单");
+      return; // 记得在出错时 return，以便进入 finally 块
+    }
+    const ratingMinRaw = el("#cf-rating-min").value.trim();
+    const ratingMaxRaw = el("#cf-rating-max").value.trim();
+    const tagsRaw = el("#cf-tags").value.trim();
+    const countRaw = el("#cf-count").value.trim();
+    const includeTags = !!el("#cf-include-tags").checked;
+    const handle = (el("#cf-handle")?.value || "").trim();
+    const excludeSolved = !!el("#cf-exclude-solved")?.checked;
 
-        const { problems } = await loadCFProblemset(false);
+    if (excludeSolved) {
+      if (!handle) {
+        alert("已勾选“排除已AC”，请填写 CF 账号");
+        return;
+      }
+      const st = await validateCFHandle(handle);
+      if (!st.ok) {
+        alert(st.reason === "not_found" ? "CF 账号不存在，请检查" : "网络错误，稍后再试");
+        return;
+      }
+    }
 
-        let solvedSet = null;
-        if (excludeSolved && handle) solvedSet = await loadCFSolvedSet(handle);
+    const ratingMin = ratingMinRaw ? Number(ratingMinRaw) : null;
+    const ratingMax = ratingMaxRaw ? Number(ratingMaxRaw) : null;
+    const requireRated = (ratingMin != null || ratingMax != null);
+    const tags = tagsRaw ? tagsRaw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+    const count = countRaw ? Number(countRaw) : 1;
 
-        const picked = pickRandomCF(problems, { ratingMin, ratingMax, tags, count, requireRated, excludeSolved, solvedSet });
-        if (!picked.length) { alert("没有匹配的题目，请调整筛选条件"); return; }
+    // 模拟网络延迟，方便观察加载动画 (正式版可删除)
+    // await new Promise(resolve => setTimeout(resolve, 1500));
 
-        const items = picked.map(p => cfProblemToAppItem(p, includeTags));
-        const existingUrls = new Set((list.problems||[]).map(x => (x.url||"").trim()));
-        const deduped = items.filter(x => x.url && !existingUrls.has(x.url.trim()));
-        if (!deduped.length) { alert("匹配题目已存在于当前题单，无新增"); return; }
+    const { problems } = await loadCFProblemset(false);
+    let solvedSet = null;
+    if (excludeSolved && handle) {
+      solvedSet = await loadCFSolvedSet(handle);
+    }
+    
+    const picked = pickRandomCF(problems, { ratingMin, ratingMax, tags, count, requireRated, excludeSolved, solvedSet });
+    if (!picked.length) {
+      alert("没有匹配的题目，请调整筛选条件");
+      return;
+    }
 
-        list.problems = [...deduped, ...(list.problems||[])];
-        persist(); renderProblems(); closeCFRandomModal();
-        alert(`已加入 ${deduped.length} 道题`);
-      } catch(err){ console.error(err); alert("抽题失败：网络错误或 CF API 异常"); }
-    });
+    const items = picked.map(p => cfProblemToAppItem(p, includeTags));
+    const existingUrls = new Set((list.problems || []).map(x => (x.url || "").trim()));
+    const deduped = items.filter(x => x.url && !existingUrls.has(x.url.trim()));
+    
+    if (!deduped.length) {
+      alert("匹配题目已存在于当前题单，无新增");
+      return;
+    }
+
+    list.problems = [...deduped, ...(list.problems || [])];
+    persist();
+    renderProblems();
+    closeCFRandomModal();
+    alert(`已加入 ${deduped.length} 道题`);
+
+  } catch (err) {
+    console.error("抽题失败:", err);
+    alert("抽题失败：网络错误或 CF API 异常，请稍后再试。");
+  } finally {
+    // 2. 无论成功或失败，都恢复按钮状态
+    if (runButton) {
+      runButton.classList.remove("btn-loading");
+      runButton.textContent = originalText;
+    }
+  }
+});
+
   }
 
   /* 登录 UI */

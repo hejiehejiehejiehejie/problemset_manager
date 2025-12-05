@@ -33,7 +33,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
 .main { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 
 /* 侧栏头部 */
-.sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--border); }
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border); }
 .sidebar-header h1 { font-size: 16px; margin: 0; letter-spacing: .3px; }
 .sidebar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .sidebar-header button { background: var(--accent-2); color: #fff; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
@@ -69,7 +69,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
 .sidebar-actions { padding: 12px; border-top: 1px solid var(--border); }
 
 /* 顶部工具栏 */
-.toolbar { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--panel); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+.toolbar { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 20px 12px; border-bottom: 1px solid var(--border); background: var(--panel); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
 .current-list { display: flex; gap: 8px; align-items: center; min-width: 300px; flex: 1 1 420px; }
 #list-name-input { flex: 1 1 200px; min-width: 160px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-weight: normal; font-size: 16px; }
 .search { display: flex; gap: 8px; align-items: center; flex: 1 1 380px; min-width: 240px; }
@@ -85,7 +85,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
 .update-banner .update-actions { display: flex; gap: 8px; align-items: center; }
 
 /* 表格与滚动 */
-.table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px; position: relative; }
+.table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px; position: relative; container-type: inline-size; container-name: problems-container; }
 table { width: 100%; border-collapse: collapse; }
 thead th { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--border); }
 th, td { border-bottom: 1px solid var(--border); padding: 10px 8px; vertical-align: middle; white-space: nowrap; }
@@ -109,18 +109,185 @@ button.danger { border-color: var(--danger); color: #ffd2cf; }
 
 /* 极简“更多”图标按钮 */
 .icon-btn { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: transparent; border: 1px solid var(--border); color: var(--muted); }
-.icon-btn:hover { color: var(--text); border-color: var(--accent-2); }
 .icon-btn svg { width: 16px; height: 16px; display: block; color: currentColor; }
 
 .hidden-actions { display: none; }
 
-/* Popover 与菜单（z-index 提升） */
-.popover {position: absolute; z-index: 1500; min-width: 200px; max-width: 320px; max-height: 360px; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); padding: 6px; scrollbar-gutter: stable both-edges; }
-.menu { display: flex; flex-direction: column; gap: 4px; }
-.menu-item { display: block; width: 100%; text-align: left; background: transparent; color: var(--text); border: 1px solid transparent; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
-.menu-item:hover { background: #151a22; border-color: var(--border); }
-.menu-item[disabled] { opacity: .5; cursor: not-allowed; }
-.menu-divider { margin: 6px 4px; height: 1px; background: var(--border); border-radius: 1px; }
+/* =========================================
+   【Popover 容器样式优化】 - 更轻盈的阴影
+   ========================================= */
+.popover {
+  position: absolute;
+  z-index: 1500;
+  min-width: 180px;
+  max-width: 260px;
+  
+  /* 视觉风格：轻盈悬浮卡片 */
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  
+  /* 
+   * 阴影重构：
+   * - 第一层阴影 (0 4px 6px -1px): 短距离、小模糊，提供清晰的轮廓感。
+   * - 第二层阴影 (0 10px 15px -3px): 长距离、大模糊，提供柔和的氛围感。
+   * 整体颜色更淡 (rgba(0,0,0,0.1) 和 0.05)，减少厚重感。
+   */
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+    0 2px 4px -2px rgba(0, 0, 0, 0.1);
+
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  
+  /* 动画保持不变 */
+  opacity: 0;
+  transform: scale(0.95);
+  transform-origin: top right;
+  transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.2, 0, 0.13, 1.5);
+  
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+}
+
+/* 激活状态 */
+.popover.anim-enter {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* 浅色模式下的阴影适配 */
+[data-theme="light"] .popover {
+  background: #ffffff;
+  /* 浅色模式下的阴影颜色更淡 */
+  box-shadow: 
+    0 4px 6px -1px rgba(16, 24, 40, 0.03), 
+    0 2px 4px -2px rgba(16, 24, 40, 0.08);
+  border: 1px solid #eaecf0; /* 浅色模式边框也可以更淡 */
+}
+
+
+/* 2. 菜单滚动区 */
+.popover .menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px; /* 菜单项之间的微小间距 */
+  overflow-y: auto;
+  max-height: 320px;
+}
+
+/* 3. 菜单项 (核心重构) */
+.menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px; /* 图标与文字间距 */
+  width: 100%;
+  padding: 8px 10px; /* 舒适的点击区域 */
+  
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  
+  text-align: left;
+  font-size: 13.5px; /* 略微减小字号，更显精致 */
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1;
+  
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  user-select: none;
+}
+
+/* 菜单项内图标 */
+.menu-item svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted); /* 图标默认灰色 */
+  flex-shrink: 0;
+  transition: color 0.1s;
+}
+
+/* Hover 状态：极简风格不使用品牌色背景，而是深灰背景 */
+.menu-item:hover, .menu-item:focus-visible {
+  background: rgba(125, 125, 125, 0.15); /* 通用的微弱高亮 */
+  color: var(--text);
+  outline: none;
+}
+.menu-item:hover svg {
+  color: var(--text); /* Hover 时图标变亮 */
+}
+
+/* 危险项 */
+.menu-item.danger { color: #ff7b72; }
+.menu-item.danger svg { color: #ff7b72; }
+.menu-item.danger:hover { background: rgba(248, 81, 73, 0.1); }
+
+/* 禁用项 */
+.menu-item[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* 快捷键提示 (可选，如果有的话) */
+.menu-shortcut {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+/* 4. 分隔线 */
+.menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 6px;
+  opacity: 0.5;
+}
+
+/* 5. 标签选择器 (Tag Popover) 特化 */
+/* 更加扁平化 */
+.popover .pop-section {
+  padding: 8px;
+}
+.popover .pop-section:not(:last-child) {
+  margin-bottom: 4px;
+}
+.popover h4 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 6px 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.popover .input-sm {
+  font-size: 13px;
+  background: rgba(0,0,0,0.2);
+  border-color: transparent;
+}
+.popover .input-sm:focus {
+  background: var(--input-bg);
+  border-color: var(--accent-2);
+}
+
+/* 浅色模式适配 */
+[data-theme="light"] .popover {
+  background: #ffffff;
+  box-shadow: 
+    0 2px 12px rgba(0, 0, 0, 0.08),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+[data-theme="light"] .menu-item:hover {
+  background: #f3f4f6;
+}
+[data-theme="light"] .popover .input-sm {
+  background: #f6f8fa;
+  border: 1px solid var(--border);
+}
 
 /* 标签 */
 .tag-wrap { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -136,25 +303,278 @@ button.danger { border-color: var(--danger); color: #ffd2cf; }
 .sidebar-resizer:hover::before, body.resizing .sidebar-resizer::before { background: rgba(56,139,253,0.6); }
 body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
 
-/* Modal */
-.modal.hidden { display: none; }
-.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: grid; place-items: center; z-index: 2000; }
-.modal-content { width: min(900px, 92vw); max-height: 88vh; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
-.modal-header, .modal-footer { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-.modal-footer { border-top: 1px solid var(--border); border-bottom: none; }
-.modal-body { padding: 12px; }
-#tags-modal .modal-header, #cf-random-modal .modal-header { position: sticky; top: 0; z-index: 2; background: var(--panel); }
-#cf-random-modal .modal-footer { justify-content: flex-end; }
+/* =========================================
+   【Modal 重构】全局弹窗容器
+   ========================================= */
+.modal.hidden { display: none !important; }
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6); /* 深色遮罩 */
+  backdrop-filter: blur(4px);      /* 毛玻璃背景 */
+  display: grid;
+  place-items: center;
+  z-index: 2000;
+  animation: modal-fade-in 0.2s ease forwards;
+}
 
-/* 标签库管理 */
-.taglib-toolbar { margin-bottom: 8px; }
-.lib-cat { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: #0f1319; }
-.lib-cat-head { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-.lib-cat-head .spacer { flex: 1; }
-.lib-cat-body { padding: 8px 10px; }
-.lib-chip-list { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 6px 0; }
-.lib-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: #0f1319; border: 1px solid var(--border); color: var(--text); font-size: 12px; line-height: 1.2; white-space: nowrap; }
-.chip-del { width: 18px; height: 18px; padding: 0; line-height: 16px; font-size: 11px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; margin-left: 4px; }
+.modal-content {
+  width: min(600px, 90vw); /* 限制最大宽度，更精致 */
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px; /* 更大的圆角 */
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 24px 48px rgba(0, 0, 0, 0.6);
+  animation: modal-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden; /* 防止内部圆角溢出 */
+}
+
+/* 动画关键帧 */
+@keyframes modal-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-slide-up { from { opacity: 0; transform: scale(0.96) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+/* =========================================
+   【Modal 头部】美化重构
+   ========================================= */
+.modal-header {
+  position: sticky; /* 头部可以吸顶 */
+  top: 0;
+  z-index: 1; /* 确保在滚动时覆盖内容 */
+  
+  padding: 14px 24px; /* 增加上下内边距，更舒适 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  
+  background: var(--panel); /* 使用面板背景，与 Modal content 一致 */
+  border-top-left-radius: 16px; /* 确保顶部圆角继承 */
+  border-top-right-radius: 16px;
+}
+
+.modal-header h2 {
+  font-size: 17px; /* 标题字号略大 */
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+  letter-spacing: 0.2px; /* 增加一点字间距 */
+}
+
+/* 关闭按钮 */
+.modal-header button {
+  width: 28px; height: 28px; /* 缩小关闭按钮尺寸 */
+  font-size: 18px; /* 保持图标大小 */
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px; /* 圆角矩形 */
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-header button:hover {
+  background: rgba(125,125,125,0.1); /* 浅灰色背景 */
+  color: var(--text);
+}
+.modal-header button:active {
+  transform: scale(0.95);
+}
+
+/* 主体 */
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* =========================================
+   【Modal 底部】美化重构
+   ========================================= */
+.modal-footer {
+  position: sticky; /* 底部可以吸底 */
+  bottom: 0;
+  z-index: 1; /* 确保在滚动时覆盖内容 */
+  
+  padding: 10px 24px; /* 与头部保持一致的内边距 */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* 按钮靠右对齐 */
+  gap: 12px;
+  
+  background: var(--panel); /* 与 Modal content 一致 */
+  border-bottom-left-radius: 16px; /* 确保底部圆角继承 */
+  border-bottom-right-radius: 16px;
+}
+
+/* 浅色模式适配 */
+[data-theme="light"] .modal-header,
+[data-theme="light"] .modal-footer {
+  background: #ffffff; /* 浅色模式下保持白色背景 */
+}
+
+/* =========================================
+   【表单控件】通用美化
+   ========================================= */
+/* 标签文字 */
+.small-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+/* 输入框 */
+.modal input[type="text"],
+.modal input[type="number"],
+.modal input[type="email"],
+.modal input[type="password"] {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.15s;
+}
+.modal input:focus {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.15);
+}
+
+/* 布局网格辅助 */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.form-group { margin-bottom: 16px; }
+
+/* =========================================
+   【随机 CF】特定样式
+   ========================================= */
+/* 预设标签 Chip */
+.preset-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.preset-chip {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: rgba(125,125,125,0.1);
+  border: 1px solid transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.preset-chip:hover {
+  background: rgba(56, 139, 253, 0.15);
+  color: var(--accent-2);
+  border-color: rgba(56, 139, 253, 0.3);
+}
+
+/* 选项 Checkbox */
+.cf-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  background: rgba(125,125,125,0.05);
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+.cf-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.cf-opt input[type="checkbox"] { accent-color: var(--accent-2); width: 16px; height: 16px; }
+
+/* 微调控件 (Spinner) */
+.spin-wrap { position: relative; }
+.spin-wrap input { padding-right: 28px; }
+.spin-ctl {
+  position: absolute; right: 4px; top: 4px; bottom: 4px; width: 20px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.spin-mini {
+  flex: 1; padding: 0; border: 0; background: rgba(125,125,125,0.1);
+  border-radius: 3px; cursor: pointer; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.spin-mini:hover { background: var(--accent-2); color: #fff; }
+
+/* =========================================
+   【标签库】卡片式布局
+   ========================================= */
+#taglib-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 分类卡片 */
+.lib-cat {
+  background: var(--input-bg); /* 与背景稍微区分 */
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.lib-cat:hover { border-color: var(--muted); }
+
+/* 卡片头 */
+.lib-cat-head {
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lib-cat-name { font-weight: 600; font-size: 14px; color: var(--text); }
+
+/* 卡片内容 */
+.lib-cat-body { padding: 12px 14px; }
+
+/* 标签云 */
+.lib-chip-list {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+}
+.lib-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+.chip-del {
+  width: 16px; height: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px; cursor: pointer;
+  color: var(--muted); background: transparent; border: 0;
+}
+.chip-del:hover { background: var(--danger); color: #fff; }
+
+/* 底部添加栏 */
+.lib-controls {
+  display: flex; gap: 8px; align-items: center;
+}
 
 /* 拖拽视觉 */
 .drag-placeholder { height: 10px; margin: 4px 0; border: 2px dashed var(--accent-2); border-radius: 6px; }
@@ -216,7 +636,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .popover::-webkit-scrollbar-track, .modal-content::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 8px; }
 
 /* 移动端卡片化表格 */
-@media (max-width: 760px) {
+@container problems-container (max-width: 676px) {
   .problems-table { border: 0; }
   .problems-table thead { display: none; }
   .problems-table, .problems-table tbody, .problems-table tr, .problems-table td { display: block; width: 100%; }
@@ -350,7 +770,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   opacity: .5; cursor: not-allowed;
 }
 .popover.context-menu .menu-divider {
-  margin: 4px 3px;
+  margin: 6px 3px;
   height: 1px;
   background: var(--border);
   border-radius: 1px;
@@ -400,7 +820,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   }
 }
 /* 仅增大容器的上下留白，不改左右与内部项 */
-.popover.context-menu {
+.popover:not(.context-menu) {
   padding-top: 10px;   /* 调大：如 20/24 都可以 */
   padding-bottom: 10px;
 }
@@ -418,24 +838,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   padding-right: 2px;
   --cm-pad-x: 10px;    /* 菜单项左右（原来用的是 var(--cm-pad-x)） */
 }
-/* 紧凑标题栏：标签库 / 随机CF / 登录 / 高级筛选 */
-#tags-modal .modal-header,
-#cf-random-modal .modal-header,
-#auth-modal .modal-header,
-#filter-modal .modal-header {
-  padding: 6px 10px;   /* 原 10px 12px，缩小上下内边距 */
-  min-height: 0;       /* 防止最小高度撑高 */
-}
 
-/* 标题字号与行高更紧凑 */
-#tags-modal .modal-header h2,
-#cf-random-modal .modal-header h2,
-#auth-modal .modal-header h2,
-#filter-modal .modal-header h2 {
-  font-size: 19px;     /* 可改 15/13 按需 */
-  line-height: 1.2;
-  margin: 0;
-}
 /* 窄屏下让“没有匹配的题目”这类跨列单元格真正居中显示 */
 @media (max-width: 760px) {
   .problems-table tbody tr td[colspan] {
@@ -570,12 +973,8 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   .toolbar .search-icon { display: none; }
   .toolbar .search-wrapper { padding-left: 12px; }
 }
-/* 让 toolbar 始终在抽屉遮罩之上，保证可点 */
-.toolbar {
-  z-index: 1300; /* 大于 #sidebar-backdrop 的 1190；仍低于 .popover(1500)/.modal(2000) */
-}
 
-/* 防止点击命中到按钮里的 svg 导致外部点击被误判：让事件落到 button 本身 */
+/* 避免点击命中到按钮里的 svg 导致外部点击被误判：让事件落到 button 本身 */
 .toolbar .icon-btn > svg,
 .toolbar .danger-icon-btn > svg,
 .toolbar .filter-btn > svg,
@@ -618,9 +1017,6 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
     display: inline-flex !important;
   }
 }
-
-/* 让 toolbar 始终在抽屉遮罩之上（避免按钮被遮住），不影响 popover/modal */
-.toolbar { z-index: 1300; }
 
 /* 避免点击落在 svg 而导致“外部点击”误判收起 popover */
 .toolbar .icon-btn > svg,
@@ -692,7 +1088,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 }
 /* Toolbar：更紧凑的垂直间距（仅作用于 toolbar） */
 .toolbar {
-  height: 52px;              /* 原 64px → 52px */
+  height: 51px;              /* 原 64px → 52px */
   padding: 0 16px;           /* 原 0 24px → 0 16px */
   gap: 16px;                 /* 原 24px → 16px */
 }
@@ -782,4 +1178,91 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
     gap: 8px;
     padding: 0 8px;
   }
+}
+/* =========================================
+   【修复】标签库布局微调
+   ========================================= */
+
+/* 1. 为标签库工具栏 (输入框区域) 增加下边距 */
+.taglib-toolbar {
+  margin-bottom: 16px; /* 原本可能是 8px 或没有，增加到 16px */
+}
+
+/* 2. 调整工具栏输入框样式，保持与弹窗内其他输入框一致 */
+#tags-modal .taglib-toolbar input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.15s;
+}
+#tags-modal .taglib-toolbar input:focus {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.15);
+}
+
+/* 3. （可选，但推荐）确保 icon-btn 在标签库中尺寸统一 */
+#tags-modal .icon-btn.danger {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.1s;
+}
+#tags-modal .icon-btn.danger:hover {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--danger);
+}
+/* =========================================
+   【按钮加载动画】
+   ========================================= */
+
+/* 1. 定义旋转动画 */
+@keyframes button-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 2. 加载状态下的按钮样式 */
+.btn-loading {
+  position: relative;
+  color: transparent !important; /* 隐藏原始文字 */
+  pointer-events: none; /* 禁用点击 */
+  cursor: wait; /* 鼠标变为等待状态 */
+}
+
+/* 3. 在按钮内部创建加载指示器 */
+.btn-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  
+  /* 指示器尺寸和样式 */
+  width: 16px;
+  height: 16px;
+  margin-top: -8px; /* 垂直居中 */
+  margin-left: -8px; /* 水平居中 */
+  
+  border: 2px solid rgba(255, 255, 255, 0.5); /* 浅色边框 */
+  border-top-color: #ffffff; /* 顶部颜色，形成旋转缺口 */
+  border-radius: 50%;
+  
+  /* 应用旋转动画 */
+  animation: button-spinner-spin 0.7s linear infinite;
+}
+
+/* 针对 btn-ghost 的加载指示器颜色适配 */
+.btn-ghost.btn-loading::after {
+  border-color: rgba(125, 125, 125, 0.5);
+  border-top-color: var(--text);
 }
