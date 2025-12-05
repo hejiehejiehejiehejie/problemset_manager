@@ -56,24 +56,26 @@
 
         <div class="toolbar-section toolbar-center">
           <div class="search-wrapper">
+            <!-- 搜索放大镜图标（纯装饰，窄屏可隐藏） -->
             <span class="search-icon">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </span>
+            
             <input id="search-input" placeholder="搜索题目..." aria-label="搜索题目" />
-            <button id="advanced-filter-btn" class="filter-btn" title="高级筛选">
-              <span class="search-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-              </span>
+            
+            <!-- 漏斗筛选按钮（必须一直显示） -->
+            <!-- 注意：这里去掉了外层的 span.search-icon，直接放 button -->
+            <button id="advanced-filter-btn" class="filter-btn" title="筛选">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              </svg>
             </button>
           </div>
         </div>
+
 
         <!-- 右侧：新增/随机操作 + 工具按钮 -->
         <div class="toolbar-section toolbar-right">
@@ -86,6 +88,15 @@
               <span class="btn-text">新增</span>
             </button>
             <button id="cf-random-btn" class="btn-ghost btn-sm" title="随机抽取 Codeforces 题目">
+              <!-- 这里必须有一个 SVG，否则窄屏隐藏文字后按钮就是空的 -->
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                <path d="M16 8h.01"></path>
+                <path d="M8 8h.01"></path>
+                <path d="M8 16h.01"></path>
+                <path d="M16 16h.01"></path>
+                <path d="M12 12h.01"></path>
+              </svg>
               <span class="btn-text">随机CF</span>
             </button>
           </div>
@@ -295,7 +306,7 @@
   <div id="filter-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="filter-title">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 id="filter-title">高级筛选</h2>
+        <h2 id="filter-title">筛选</h2>
         <button id="filter-close" aria-label="关闭">✕</button>
       </div>
       <div class="modal-body">

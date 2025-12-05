@@ -55,6 +55,17 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
 /* 窄屏可选择隐藏品牌文字，仅保留图标 */
 @media (max-width: 900px) {
   .brand-text { display: none; }
+  .toolbar .btn-sm svg {
+    display: block !important;
+    margin-right: 0 !important; /* 文字隐藏了，图标就不需要右边距了 */
+  }
+  
+  /* 调整按钮内边距，使其变成正方形或接近正方形 */
+  .toolbar .btn-sm {
+    padding: 0;
+    width: 28px; /* 固定宽度 */
+    justify-content: center;
+  }
 }
 
 /* 侧栏列表 */
@@ -95,6 +106,19 @@ th, td { border-bottom: 1px solid var(--border); padding: 10px 8px; vertical-ali
 td a { color: var(--accent-2); text-decoration: none; word-break: break-all; }
 
 /* 表单与按钮 */
+.btn-sm {
+  padding: 4px 8px;          /* 横向内边距更紧凑 */
+  font-size: 13px;           /* 略小字号 */
+  height: 28px;              /* 固定高度，便于对齐 */
+  line-height: 1;
+  border-radius: 8px;
+  min-width: 44px;           /* 保留最小点击面积（桌面） */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform .06s ease, filter .08s ease;
+}
 .input-sm { width: 100%; padding: 4px 8px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 13px; line-height: 1.2; }
 button { background: #21262d; color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; transition: border-color .12s ease, background .12s ease, transform .05s ease; }
 button:hover { border-color: var(--accent-2); }
@@ -292,7 +316,7 @@ button.danger { border-color: var(--danger); color: #ffd2cf; }
 /* 标签 */
 .tag-wrap { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .tag-wrap.centered { justify-content: center; }
-.tag-chip { display: inline-flex; align-items: center; margin: 1px; gap: 5px; padding: 2px 10px; border-radius: 999px; background: #1a1f27; border: 1px solid #2b313a; color: var(--chip-text); font-size: 12px; }
+.tag-chip { display: inline-flex; align-items: center; margin: 1px; gap: 5px; padding: 3px 10px; border-radius: 999px; background: #1a1f27; border: 1px solid #2b313a; color: var(--chip-text); font-size: 12px; }
 .tag-chip .remove { cursor: pointer; color: var(--muted); }
 .add-tag-btn { display: inline-flex; justify-content: center; align-items: center; width: 24px; height: 24px; border-radius: 999px; border: 1px dashed var(--border); color: var(--muted); background: transparent; margin-left: 6px; font-size: 14px; }
 .add-tag-btn:hover { border-color: var(--accent-2); color: var(--accent-2); }
@@ -503,19 +527,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 }
 .cf-opt input[type="checkbox"] { accent-color: var(--accent-2); width: 16px; height: 16px; }
 
-/* 微调控件 (Spinner) */
-.spin-wrap { position: relative; }
-.spin-wrap input { padding-right: 28px; }
-.spin-ctl {
-  position: absolute; right: 4px; top: 4px; bottom: 4px; width: 20px;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.spin-mini {
-  flex: 1; padding: 0; border: 0; background: rgba(125,125,125,0.1);
-  border-radius: 3px; cursor: pointer; color: var(--muted);
-  display: flex; align-items: center; justify-content: center;
-}
-.spin-mini:hover { background: var(--accent-2); color: #fff; }
 
 /* =========================================
    【标签库】卡片式布局
@@ -614,17 +625,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 /* 数字输入与微调按钮 */
 input[type="number"] { appearance: textfield; -moz-appearance: textfield; -webkit-appearance: none; }
 input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none !important; appearance: none !important; margin: 0; opacity: 0; pointer-events: none; }
-.spin-wrap { position: relative; display: inline-block; }
-.spin-wrap .input-sm { padding-right: 30px; }
-.spin-ctl { position: absolute; right: 2px; top: 2px; bottom: 2px; width: 24px; display: flex; flex-direction: column; gap: 2px; }
-.spin-mini { flex: 1 1 0; min-height: 0; padding: 0; border-radius: 6px; background: var(--chip); border: 1px solid var(--chip-border); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; user-select: none; }
-.spin-mini:hover { border-color: var(--accent-2); }
-.spin-mini:active { background: #1a1f27; }
-.spin-mini[data-dir="up"]::before { content: ""; width: 0; height: 0; display: block; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid var(--muted); transition: border-bottom-color .15s ease; }
-.spin-mini[data-dir="up"]:hover::before { border-bottom-color: var(--text); }
-.spin-mini[data-dir="down"]::before { content: ""; width: 0; height: 0; display: block; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid var(--muted); transition: border-top-color .15s ease; }
-.spin-mini[data-dir="down"]:hover::before { border-top-color: var(--text); }
-
+.problems-table td {
+  padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle;
+  height: 65px; line-height: 1.2; /* 设置默认高度 */
+  display: table-cell; /* 确保默认行为是表格单元格，方便高度生效 */
+}
 /* 细滚动条 */
 .scrollable, .popover, .modal-content, #lists, .table-wrap, .cat-body, .lib-cat-body, .actions { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -641,7 +646,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   .problems-table thead { display: none; }
   .problems-table, .problems-table tbody, .problems-table tr, .problems-table td { display: block; width: 100%; }
   .problems-table tbody tr { background: #0f1319; border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
-  .problems-table td { border: 0; padding: 8px 0; display: flex; gap: 8px; align-items: center; justify-content: space-between; white-space: normal; }
+  .problems-table td { height: auto !important; border: 0; padding: 8px 0; display: flex; gap: 8px; align-items: center; justify-content: space-between; white-space: normal; }
   .problems-table td::before { content: attr(data-label); color: var(--muted); font-size: 12px; margin-right: 10px; flex: 0 0 auto; }
   .cell-tags { justify-content: flex-start; }
   .cell-actions { justify-content: flex-end; }
@@ -1265,4 +1270,189 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .btn-ghost.btn-loading::after {
   border-color: rgba(125, 125, 125, 0.5);
   border-top-color: var(--text);
+}
+/* ================= 微调按钮重构 (方案二：实体色块风格) ================= */
+@container toolbar-container (max-width: 600px) {
+  .toolbar-center {
+    display: none !important;
+  }
+  
+  .toolbar {
+    grid-template-columns: 1fr max-content;
+  }
+
+  /* --- 新增代码在这里 --- */
+  
+  /* 隐藏按钮文字 */
+  .toolbar .btn-sm .btn-text {
+    display: none !important;
+  }
+
+  /* 确保 SVG 图标显示 */
+  .toolbar .btn-sm svg {
+    display: block !important;
+    margin: 0 !important; /* 去掉文字存在时可能有的间距 */
+  }
+
+  /* 调整按钮为小方块 */
+  .toolbar .btn-sm {
+    padding: 0 !important;
+    width: 28px !important;  /* 固定宽度，与工具栏其他图标按钮对齐 */
+    height: 28px !important; /* 固定高度 */
+    justify-content: center;
+  }
+  
+  /* --- 新增代码结束 --- */
+}
+/* 1. 容器：相对定位 */
+.spin-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* 2. 输入框：右侧留出足够空间，防止文字被遮挡 */
+.spin-wrap input {
+  padding-right: 30px !important; 
+}
+
+/* 3. 控制器容器：绝对定位在右侧，留一点间隙 */
+.spin-ctl {
+  position: absolute;
+  right: 3px;          /* 距离右边缘留一点空隙，不贴边 */
+  top: 3px;
+  bottom: 3px;
+  width: 20px;         /* 按钮宽度 */
+  display: flex;
+  flex-direction: column;
+  gap: 2px;            /* 上下按钮之间留微小缝隙 */
+  z-index: 2;
+}
+
+/* 4. 按钮基础样式：默认是浅灰色的小方块 */
+.spin-mini {
+  flex: 1;             /* 上下平分高度 */
+  border: none;
+  border-radius: 4px;  /* 小圆角 */
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* 默认背景色：非常淡的灰色，不抢眼 */
+  background-color: rgba(125, 125, 125, 0.15);
+  transition: all 0.15s ease;
+}
+
+/* 5. 按钮内图标：使用 clip-path 绘制完美的实心三角形 */
+.spin-mini::after {
+  content: "";
+  display: block;
+  width: 8px;   /* 三角形宽度 */
+  height: 6px;  /* 三角形高度 */
+  background-color: var(--muted); /* 默认图标颜色：灰色 */
+  transition: background-color 0.15s;
+}
+
+/* --- 向上箭头形状 --- */
+.spin-mini[data-dir="up"]::after {
+  /* 裁剪成等腰三角形：底边在上无法实现，这里是用三个点坐标绘制 */
+  /* 点1(50% 0): 顶部中间 */
+  /* 点2(0 100%): 左下角 */
+  /* 点3(100% 100%): 右下角 */
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+/* --- 向下箭头形状 --- */
+.spin-mini[data-dir="down"]::after {
+  /* 点1(0 0): 左上角 */
+  /* 点2(100% 0): 右上角 */
+  /* 点3(50% 100%): 底部中间 */
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+}
+
+/* 6. 交互状态 (Hover & Active) */
+
+/* 悬停时：按钮背景变品牌色，图标变白 */
+.spin-mini:hover {
+  background-color: var(--accent-2); /* 蓝色背景 */
+}
+.spin-mini:hover::after {
+  background-color: #ffffff; /* 白色箭头 */
+}
+
+/* 点击时：稍微变暗，增加按压感 */
+.spin-mini:active {
+  transform: scale(0.92); /* 微缩放动画 */
+  filter: brightness(0.9);
+}
+
+/* 浅色模式适配（可选，如果你的背景很白，灰色需要深一点） */
+[data-theme="light"] .spin-mini {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+/* ... 现有的样式 ... */
+
+/* ================= 极小屏适配优化 (使用容器查询) ================= */
+
+/* 1. 为 .toolbar 声明为容器 */
+.toolbar {
+  container-type: inline-size; /* 允许基于内联轴（宽度）进行查询 */
+  container-name: toolbar-container; /* 给这个容器一个名字，方便查询 */
+  /* 其他 toolbar 样式保持不变 */
+}
+
+/* 1. 当屏幕宽度 < 600px 时，隐藏搜索功能 */
+@container toolbar-container (max-width: 600px) {
+  .toolbar-center {
+    display: none !important;
+  }
+}
+
+/* 2. 当屏幕宽度 < 500px 时，隐藏标题输入组 (list-info-group) */
+@container toolbar-container (max-width: 500px) {
+  .list-info-group {
+    display: none !important;
+  }
+
+  /* 此时左侧只剩下汉堡菜单按钮，可能显得太空 */
+  /* 我们可以让右侧工具栏撑满 */
+  .toolbar {
+    grid-template-columns: max-content 1fr; 
+  }
+  
+  /* 让右侧工具栏靠右对齐 */
+  .toolbar-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* 修复漏斗图标显示 */
+.toolbar .filter-btn {
+  display: block; /* 强制显示 */
+  z-index: 10; /* 确保在最上层 */
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.toolbar .filter-btn svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+@container toolbar-container (max-width: 600px) {
+  .toolbar #advanced-filter-btn {
+    display: none !important;
+    margin-left: 0;
+  }
+}
+
+#cf-random-btn svg{
+  display: none;
 }

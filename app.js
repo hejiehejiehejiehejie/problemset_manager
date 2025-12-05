@@ -532,106 +532,128 @@ function matchQuery(p, q) {
   return true;
 }
 
-/* Popover（共享） */
+/* --- Popover 工具 (修复版) --- */
 let currentPopover = null;
-let currentPopoverAnchor = null;
-let __popRaf = 0;
+let popoverCleanup = null; // 用于存储清理函数
 
 function closePopover() {
-  if (!currentPopover) return;
-  document.removeEventListener("click", outsideClickOnce, { capture: true });
-  window.removeEventListener("resize", onWindowResize);
-  window.removeEventListener("scroll", onWindowScroll, true);
-  currentPopover.remove(); currentPopover = null;
-  currentPopoverAnchor = null;
+  if (currentPopover) {
+    currentPopover.remove();
+    currentPopover = null;
+  }
+  // 执行清理函数（移除事件监听等）
+  if (popoverCleanup) {
+    popoverCleanup();
+    popoverCleanup = null;
+  }
 }
-function outsideClickOnce(e){ if(currentPopover && !currentPopover.contains(e.target) && e.target !== currentPopoverAnchor) closePopover(); }
-function positionPopover(pop, anchorEl) {
-  const rect = anchorEl.getBoundingClientRect();
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+
+// 重新定位函数：确保 Popover 始终跟随锚点
+function updatePopoverPosition(pop, anchor) {
+  if (!pop || !anchor || !anchor.isConnected) return;
   
-  // 必须先显示出来才能获取 offsetWidth/Height，但要保持透明以避免闪烁
-  // CSS 中已默认 opacity: 0
-  
-  const pw = pop.offsetWidth || 320;
-  const ph = pop.offsetHeight || 200;
+  const rect = anchor.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  const viewportHeight = window.innerHeight;
+  const viewportWidth = window.innerWidth;
 
   // 默认位置：按钮正下方，左对齐
-  let top = rect.bottom + window.scrollY + 8;
-  let left = rect.left + window.scrollX;
-  let originY = "top";
-  let originX = "left";
+  let top = rect.bottom + 6;
+  let left = rect.left;
 
-  // 水平碰撞检测：如果右侧溢出，则尝试右对齐
-  if (left + pw > window.scrollX + vw - 12) {
-    left = Math.max(window.scrollX + 12, rect.right + window.scrollX - pw);
-    originX = "right";
+  // 垂直碰撞检测：如果下方空间不足，放上方
+  if (top + popRect.height > viewportHeight - 10) {
+    top = rect.top - popRect.height - 6;
   }
 
-  // 垂直碰撞检测：如果下方溢出，则放上方
-  if (top + ph > window.scrollY + vh - 12) {
-    top = Math.max(window.scrollY + 12, rect.top + window.scrollY - ph - 8);
-    originY = "bottom";
+  // 水平碰撞检测：如果右边溢出，靠右对齐
+  if (left + popRect.width > viewportWidth - 10) {
+    left = Math.max(10, viewportWidth - popRect.width - 10);
   }
 
-  pop.style.top = `${top}px`;
-  pop.style.left = `${left}px`;
-  
-  // 设置动画原点，使弹窗仿佛从按钮中长出来
-  pop.style.transformOrigin = `${originY} ${originX}`;
+  pop.style.top = `${top + window.scrollY}px`; // 加上 scrollY 转换为绝对坐标
+  pop.style.left = `${left + window.scrollX}px`;
 }
 
-function positionPopoverVerticalOnly(pop, anchorEl) {
-  const rect = anchorEl.getBoundingClientRect();
-  let top = rect.bottom + window.scrollY + 6;
-  const vh = window.innerHeight;
-  const ph = pop.offsetHeight || 240;
-  if (top + ph > window.scrollY + vh - 8) {
-    top = Math.max(window.scrollY + 8, rect.top + window.scrollY - ph - 6);
-  }
-  pop.style.top = `${top}px`;
-}
-function onWindowScroll(){
-  if (!currentPopover || !currentPopoverAnchor || !currentPopoverAnchor.isConnected) { closePopover(); return; }
-  if (__popRaf) cancelAnimationFrame(__popRaf);
-  __popRaf = requestAnimationFrame(() => {
-    __popRaf = 0;
-    positionPopoverVerticalOnly(currentPopover, currentPopoverAnchor);
-  });
-}
-function onWindowResize(){
-  if (!currentPopover || !currentPopoverAnchor || !currentPopoverAnchor.isConnected) { closePopover(); return; }
-  positionPopover(currentPopover, currentPopoverAnchor);
-}
-function togglePopover(anchorEl, builder) {
-  if (currentPopover && currentPopoverAnchor === anchorEl) {
+// 通用的 Popover 切换和事件绑定逻辑
+function togglePopover(anchor, builder) {
+  // 如果点击的是当前已打开 Popover 的触发源，则关闭
+  // 注意：右键菜单通常 anchor 为 null 或虚拟对象
+  if (anchor && currentPopover && currentPopover._anchor === anchor) {
     closePopover();
     return;
   }
-  if (currentPopover) closePopover();
+  
+  // 先关闭已存在的（如果有）
+  closePopover();
 
   const pop = builder();
+  pop._anchor = anchor; // 标记触发源
   document.body.appendChild(pop);
-  
   currentPopover = pop;
-  currentPopoverAnchor = anchorEl;
+  if (anchor && anchor instanceof Element) anchor.classList.add("popover-trigger");
 
-  // 1. 定位
-  positionPopover(pop, anchorEl);
+  // 如果有锚点（普通 Popover），进行定位
+  if (anchor && anchor instanceof Element) {
+    updatePopoverPosition(pop, anchor);
+  } else {
+    // 右键菜单的位置在 openContextMenuAt 中设置
+  }
 
-  // 2. 触发动画：强制重绘后添加类名
+  // 动画
   requestAnimationFrame(() => {
     pop.classList.add("anim-enter");
   });
 
-  // 3. 绑定事件
+  // --- 事件处理 ---
+  
+  // 1. 全局监听 pointerdown 事件来关闭 Popover
+  //    使用 pointerdown 响应更快，且 composedPath() 穿透性好，能解决大部分点击外部不关闭的问题
+  const globalPointerdownHandler = (e) => {
+    // 检查事件路径是否包含 Popover 自身或其锚点
+    const path = e.composedPath(); // 获取事件的完整路径
+    
+    // 如果点击在 Popover 内部，不关闭
+    if (path.includes(pop)) return;
+    
+    // 如果点击的是触发按钮本身（且不是右键菜单），不关闭
+    if (anchor && anchor instanceof Element && path.includes(anchor)) return;
+
+    closePopover();
+  };
+
+  // 2. 窗口尺寸改变时关闭
+  const resizeHandler = () => closePopover();
+
+  // 3. 滚动时：仅跟随，不关闭
+  const scrollHandler = (e) => {
+    // 如果是 Popover 内部滚动，不处理
+    if (pop.contains(e.target)) return; 
+    
+    if (anchor && anchor instanceof Element) {
+      updatePopoverPosition(pop, anchor);
+    } else {
+      // 如果是右键菜单（无锚点），页面滚动时通常建议关闭，避免位置错乱
+      closePopover();
+    }
+  };
+
+  // 延迟绑定事件，防止当前触发 Popover 的那次点击/右键立即触发关闭
   setTimeout(() => {
-    document.addEventListener("click", outsideClickOnce, { capture: true });
-    window.addEventListener("resize", onWindowResize);
-    window.addEventListener("scroll", onWindowScroll, true);
-  }, 0);
+    document.addEventListener("pointerdown", globalPointerdownHandler, { capture: true });
+    window.addEventListener("resize", resizeHandler);
+    window.addEventListener("scroll", scrollHandler, { capture: true, passive: true });
+  }, 10); 
+
+  // 保存清理函数
+  popoverCleanup = () => {
+    document.removeEventListener("pointerdown", globalPointerdownHandler, { capture: true });
+    window.removeEventListener("resize", resizeHandler);
+    window.removeEventListener("scroll", scrollHandler, { capture: true });
+    if (anchor && anchor instanceof Element) anchor.classList.remove("popover-trigger");
+  };
 }
+
 
 /* 右键菜单（新增）：通用菜单 + 剪贴板 */
 const CLIPBOARD_KEY = "plm:clipboard:problems";
@@ -670,6 +692,8 @@ function pasteClipboardToList(list) {
   list.problems = [...news, ...(list.problems || [])];
   persist(); renderProblems(); alert(`已粘贴 ${news.length} 个题目`);
 }
+
+// 辅助：构建菜单 DOM
 function buildSimpleMenu(items) {
   const pop = document.createElement("div");
   pop.className = "popover";
@@ -681,65 +705,67 @@ function buildSimpleMenu(items) {
       continue;
     }
     const btn = document.createElement("button");
-    btn.className = "menu-item";
+    btn.className = `menu-item ${it.disabled ? 'disabled' : ''} ${it.danger ? 'danger' : ''}`;
     btn.textContent = it.text;
     if (it.disabled) btn.disabled = true;
-    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); try { it.onClick?.(); } finally { closePopover(); } });
+    btn.onclick = (e) => {
+      // 这里的关闭很重要，必须手动调用 closePopover
+      closePopover(); 
+      if (!it.disabled && it.onClick) it.onClick();
+    };
     menu.appendChild(btn);
   }
   pop.appendChild(menu);
   return pop;
 }
+
+// 右键菜单入口函数（完全重写，复用 togglePopover）
 function openContextMenuAt(pageX, pageY, items) {
+  // 1. 关闭旧的
   closePopover();
+
+  // 2. 构建菜单 DOM
   const pop = buildSimpleMenu(items);
   pop.classList.add("context-menu"); // 应用紧凑样式
-  document.body.appendChild(pop);
 
+  // 3. 复用 togglePopover 挂载并绑定全局事件
+  //    注意：传入 null 作为 anchor，表示无触发元素
+  togglePopover(null, () => pop);
+
+  // 4. 手动计算并设置位置
+  //    因为复用了 togglePopover，此时 pop 已经在 DOM 中了，可以获取尺寸
+  
   const vw = window.innerWidth, vh = window.innerHeight;
   const sx = window.scrollX, sy = window.scrollY;
-  const pad = 12;
+  const pad = 10;
   
-  // 初始获取尺寸
-  const w = pop.offsetWidth || 200;
-  const h = pop.offsetHeight || 100;
+  const w = pop.offsetWidth || 220; // 获取实际宽度
+  const h = pop.offsetHeight || (items.length * 36);
 
-  let left = pageX + 2;
-  let top = pageY + 2;
+  let left = pageX;
+  let top = pageY;
   let originX = "left";
   let originY = "top";
 
   // 右侧溢出检测
   if (left + w > sx + vw - pad) {
-    left = pageX - w - 2;
+    left = pageX - w;
     originX = "right";
   }
   // 底部溢出检测
   if (top + h > sy + vh - pad) {
-    top = pageY - h - 2;
+    top = pageY - h;
     originY = "bottom";
   }
+  
+  // 确保不溢出左上边界
+  left = Math.max(pad, left);
+  top = Math.max(pad, top);
 
   pop.style.left = left + "px";
   pop.style.top = top + "px";
   pop.style.transformOrigin = `${originY} ${originX}`;
-
-  currentPopover = pop;
-  currentPopoverAnchor = null;
-
-  // 触发动画
-  requestAnimationFrame(() => {
-    pop.classList.add("anim-enter");
-  });
-
-  setTimeout(() => {
-    document.addEventListener("click", outsideClickOnce, { capture: true });
-    window.addEventListener("resize", () => closePopover());
-    window.addEventListener("scroll", () => closePopover(), true);
-  });
 }
-
-
 
 /* 标签选择 popover */
 function buildTagPopover(problem, anchorEl, onChanged) {
@@ -858,7 +884,7 @@ function renderProblems() {
     renderCodeLinkCell(p, el(".cell-code", tr));
 
     const actCell=el(".cell-actions", tr); const rowActions=document.createElement("div"); rowActions.className="row-actions";
-    const delBtn=document.createElement("button"); delBtn.textContent="删除"; delBtn.className="danger";
+    const delBtn=document.createElement("button"); delBtn.textContent="删除"; delBtn.className="danger btn-xs";
     delBtn.addEventListener("click",()=>{
       if (!confirm(`确认删除题目「${p.title||"未命名"}」？`)) return;
       const idx=list.problems.findIndex((x)=>x.id===p.id); if (idx>=0) list.problems.splice(idx,1);
