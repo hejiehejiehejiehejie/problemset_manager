@@ -82,7 +82,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
 /* 顶部工具栏 */
 .toolbar { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 20px 12px; border-bottom: 1px solid var(--border); background: var(--panel); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
 .current-list { display: flex; gap: 8px; align-items: center; min-width: 300px; flex: 1 1 420px; }
-#list-name-input { flex: 1 1 200px; min-width: 160px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-weight: normal; font-size: 16px; }
+#list-name-input { flex: 1 1 150px; min-width: 100px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-weight: normal; font-size: 16px; }
 .search { display: flex; gap: 8px; align-items: center; flex: 1 1 380px; min-width: 240px; }
 .search input { flex: 1; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
 .actions { display: flex; gap: 12px; align-items: center; flex: 1 1 100%; width: 100%; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; scrollbar-gutter: stable; }
@@ -884,7 +884,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .toolbar-right { justify-content: flex-end; }
 
 /* 标题输入与删除 */
-.toolbar .list-info-group { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.toolbar .list-info-group { display: inline-flex; align-items: center; gap: 8px; max-width: 200px; }
 .toolbar .seamless-input {
   background: transparent;
   border: 1px solid transparent;
@@ -916,7 +916,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 /* 搜索 */
 .toolbar .search-wrapper {
   display: flex; align-items: center;
-  width: 100%; max-width: 560px; min-width: 0;
+  width: 100%; max-width: 450px; min-width: 0;
   background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 99px;
@@ -1455,4 +1455,74 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 
 #cf-random-btn svg{
   display: none;
+}
+
+/* =========================================
+   【组合按钮风格】重构 Search & Modify 样式
+   ========================================= */
+
+/* 1. 定义组合容器样式 (应用于搜索栏、题单名、表格内编辑) */
+.toolbar-center .search-wrapper,
+.input-group {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--input-bg);
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  padding: 0 !important; /* 清除原有内边距 */
+  gap: 0 !important;     /* 清除间距，实现无缝 */
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  height: 34px;          /* 固定高度 */
+}
+
+/* 聚焦态高亮 */
+.toolbar-center .search-wrapper:focus-within,
+.toolbar-center .list-info-group:focus-within,
+.input-group:focus-within {
+  border-color: var(--accent-2) !important;
+  box-shadow: 0 0 0 3px rgba(56,139,253,0.15);
+}
+
+/* 2. 输入框样式复位 (填满剩余空间) */
+.toolbar-center .search-wrapper input,
+.toolbar-center .list-info-group input,
+
+/* 3. 按钮样式复位 (右侧附着，左边框分隔) */
+.toolbar-center .search-wrapper button,
+.toolbar-center .list-info-group button,
+.input-group button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  padding: 0 10px !important;
+  margin: 0 !important;
+
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--muted);
+  height: 100% !important;
+  cursor: pointer;
+}
+
+/* 按钮悬停效果 */
+.toolbar-center .search-wrapper button:hover,
+.toolbar-center .list-info-group button:hover,
+.input-group button:hover {
+  background: rgba(125, 125, 125, 0.1) !important;
+  color: var(--text);
+}
+/* 删除按钮特殊悬停 */
+.toolbar-center .list-info-group .danger-icon-btn:hover {
+  background: rgba(248, 81, 73, 0.1) !important;
+  color: var(--danger);
+}
+
+/* 4. 细节修正 */
+/* 搜索图标位置 */
+.toolbar-center .search-wrapper .search-icon {
+  padding-left: 10px;
+  display: flex; align-items: center;
+  color: var(--muted);
 }
