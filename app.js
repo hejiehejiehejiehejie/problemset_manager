@@ -1178,7 +1178,7 @@ function pickRandomCF(problems, { ratingMin, ratingMax, tags, count, requireRate
     if (requireRated && r == null) return false;
     if (ratingMin!=null && r!=null && r<ratingMin) return false;
     if (ratingMax!=null && r!=null && r>ratingMax) return false;
-
+    if ((p.tags || []).some(tag => tag === "*special")) return false;
     if (tags && tags.length){ const own=new Set((p.tags||[]).map(t=>t.toLowerCase())); for (const t of tags){ if(!own.has(t)) return false; } }
 
     if (excludeSolved && solvedSet && solvedSet.size) {
