@@ -1,6 +1,6 @@
 {
-  "name": "题单管理器",
-  "short_name": "题单",
+  "name": "ProbList",
+  "short_name": "PL",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
