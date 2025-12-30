@@ -7,7 +7,7 @@
   "background_color": "#0f1216",
   "theme_color": "#161b22",
   "icons": [
-    { "src": "./Prob-List.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "./Prob-List.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "./Prob-List.png", "type": "image/png" },
+    { "src": "./Prob-List.png", "type": "image/png" }
   ]
 }
