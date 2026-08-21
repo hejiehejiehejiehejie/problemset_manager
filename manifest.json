@@ -1,0 +1,13 @@
+{
+  "name": "ProbList",
+  "short_name": "PL",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1216",
+  "theme_color": "#161b22",
+  "icons": [
+    { "src": "./PL.png", "size":"192×192", "type": "image/png" },
+    { "src": "./PL.png", "size":"512×512","type": "image/png" }
+  ]
+}

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="PL.png" type="image/png">
+  <link rel="apple-touch-icon" href="PL.png">
+  <title>ProbList</title>
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#161b22" />
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar" aria-label="题单侧栏">
+      <div class="sidebar-header">
+        <div id="account-area" class="account account--sidebar" aria-live="polite">
+          <button id="login-btn" title="登录">登录</button>
+          <button id="logout-btn" class="hidden" title="退出登录">退出</button>
+          <span id="account-email" class="email">未登录</span>
+        </div>
+        <div class="sidebar-right">
+          <button id="add-list-btn" title="新增题单" aria-label="新增题单">＋</button>
+        </div>
+      </div>
+
+      <nav id="lists" aria-label="题单列表"></nav>
+
+      <!-- 宽屏拖拽柄 -->
+      <div id="sidebar-resizer" class="sidebar-resizer" title="拖动调整侧栏宽度" aria-hidden="true"></div>
+    </aside>
+
+    <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
+    <main class="main" role="main">
+      <!-- 顶部工具栏（已按你的样式重构，仅此处变更） -->
+      <div class="toolbar">
+        <!-- 左侧：窄屏侧栏开关 + 题单标题 + 删除按钮 -->
+        <div class="toolbar-section toolbar-left">
+          <button id="sidebar-edge-open" class="icon-btn edge-open-btn edge-inline" title="打开侧栏" aria-label="打开侧栏">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          <div class="list-info-group">
+            <input id="list-name-input" class="seamless-input" placeholder="未命名题单" aria-label="题单名称" />
+            <button id="delete-list-btn" class="danger-icon-btn" title="删除当前题单">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a 2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="toolbar-section toolbar-center">
+          <div class="search-wrapper">
+            <!-- 搜索放大镜图标（纯装饰，窄屏可隐藏） -->
+            <span class="search-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            
+            <input id="search-input" placeholder="搜索题目..." aria-label="搜索题目" />
+            
+            <!-- 漏斗筛选按钮（必须一直显示） -->
+            <!-- 注意：这里去掉了外层的 span.search-icon，直接放 button -->
+            <button id="advanced-filter-btn" class="filter-btn" title="筛选">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+
+        <!-- 右侧：新增/随机操作 + 工具按钮 -->
+        <div class="toolbar-section toolbar-right">
+          <div class="action-group">
+            <button id="add-problem-btn" class="btn-primary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span class="btn-text">新增</span>
+            </button>
+            <button id="cf-random-btn" class="btn-ghost btn-sm" title="随机抽取 Codeforces 题目">
+              <!-- 这里必须有一个 SVG，否则窄屏隐藏文字后按钮就是空的 -->
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                <path d="M16 8h.01"></path>
+                <path d="M8 8h.01"></path>
+                <path d="M8 16h.01"></path>
+                <path d="M16 16h.01"></path>
+                <path d="M12 12h.01"></path>
+              </svg>
+              <span class="btn-text">随机CF</span>
+            </button>
+          </div>
+
+          <div class="divider-vertical"></div>
+
+          <div class="tool-group">
+            <span id="sync-status" class="sync-status" aria-live="polite"></span>
+            <button id="theme-toggle" class="icon-btn" title="切换主题">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </button>
+            <button id="toolbar-more-btn" class="icon-btn" title="更多">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="19" cy="12" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+              </svg>
+            </button>
+          </div>
+
+          <!-- 隐藏的原生按钮（保留供JS调用） -->
+          <div class="hidden-actions">
+            <button id="rename-list-btn">重命名</button>
+            <button id="export-list-btn">导出题单</button>
+            <label class="import-label"><input id="import-list-input" type="file" accept="application/json" /></label>
+            <button id="manage-tags-btn">标签库</button>
+            <button id="sync-upload-btn">上传云端</button>
+            <button id="sync-download-btn">下载云端</button>
+            <button id="export-btn">导出全部数据</button>
+            <label class="import-label"><input id="import-input" type="file" accept="application/json" /></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 更新提示条（有新版本时显示） -->
+      <div id="update-banner" class="update-banner hidden" role="status" aria-live="polite">
+        <span class="update-text">有新版本可用</span>
+        <div class="update-actions">
+          <button id="update-reload-btn" class="btn-primary btn-xs">立即更新</button>
+          <button id="update-dismiss-btn" class="btn-xxs">稍后</button>
+        </div>
+      </div>
+
+      <div class="table-wrap" aria-live="polite">
+        <table class="problems-table">
+          <thead>
+            <tr>
+              <th style="width: 15%;">标题</th>
+              <th style="width: 15%;">题目链接</th>
+              <th style="width: 15%;">难度</th>
+              <th style="width: 25%;">标签</th>
+              <th style="width: 15%;">代码链接</th>
+              <th style="width: 5%;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="problems-tbody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <template id="problem-row-tpl">
+    <tr class="problem-row">
+      <td class="cell-title"></td>
+      <td class="cell-link"></td>
+      <td class="cell-difficulty"></td>
+      <td class="cell-tags"></td>
+      <td class="cell-code"></td>
+      <td class="cell-actions"></td>
+    </tr>
+  </template>
+
+  <!-- 标签库管理面板 -->
+  <div id="tags-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="tags-modal-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="tags-modal-title">标签库管理</h2>
+        <button id="tags-modal-close" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="taglib-toolbar">
+          <input id="new-cat-input" class="input-sm" placeholder="新建分类名称后回车" aria-label="新建标签分类" />
+        </div>
+        <div id="taglib-cats"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 随机 CF 抽题弹窗 -->
+  <div id="cf-random-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="cf-random-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="cf-random-title">随机抽取 Codeforces 题目</h2>
+        <button id="cf-random-close" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+          <div style="min-width:220px;">
+            <div class="small">Rating 最小值</div>
+            <div class="spin-wrap">
+              <input id="cf-rating-min" class="input-sm" type="number" placeholder="如 1800" step="100" />
+              <div class="spin-ctl">
+                <button class="spin-mini" data-dir="up" data-target="#cf-rating-min" title="加100"></button>
+                <button class="spin-mini" data-dir="down" data-target="#cf-rating-min" title="减100"></button>
+              </div>
+            </div>
+          </div>
+          <div style="min-width:220px;">
+            <div class="small">Rating 最大值</div>
+            <div class="spin-wrap">
+              <input id="cf-rating-max" class="input-sm" type="number" placeholder="如 1900" step="100" />
+              <div class="spin-ctl">
+                <button class="spin-mini" data-dir="up" data-target="#cf-rating-max" title="加100"></button>
+                <button class="spin-mini" data-dir="down" data-target="#cf-rating-max" title="减100"></button>
+              </div>
+            </div>
+          </div>
+          <div style="min-width:320px; flex:1;">
+            <div class="small">标签（英文，逗号分隔，如 dp, math）</div>
+            <input id="cf-tags" class="input-sm" placeholder="可留空" />
+          </div>
+          <div style="min-width:160px;">
+            <div class="small">抽取数量</div>
+            <input id="cf-count" class="input-sm" type="number" min="1" max="10" value="1" />
+          </div>
+        </div>
+
+        <div class="small" style="margin-top:8px; color: var(--muted);">
+          数据来源：Codeforces 官方 problemset API（本地缓存 24h）。
+        </div>
+
+        <div style="margin-top:10px;">
+          <div class="small" style="margin-bottom:6px;">预设区间</div>
+          <div class="preset-wrap" id="cf-presets">
+            <button class="preset-chip" data-min="1300" data-max="1600">1300–1600</button>
+            <button class="preset-chip" data-min="1700" data-max="1800">1700–1800</button>
+            <button class="preset-chip" data-min="1900" data-max="2000">1900–2000</button>
+            <button class="preset-chip" data-min="2100" data-max="2200">2100–2200</button>
+            <button class="preset-chip" data-min="2300" data-max="2400">2300–2400</button>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <div class="small" style="margin-bottom:6px;">选项</div>
+          <div class="cf-options">
+            <label class="cf-opt">
+              <input id="cf-include-tags" type="checkbox" checked />
+              <span>写入题目标签</span>
+            </label>
+            <label class="cf-opt">
+              <input id="cf-prefer-new" type="checkbox" checked />
+              <span>优先近期新题</span>
+            </label>
+            
+            <!-- 优化后的排除已 AC 区域 -->
+            <label class="cf-opt">
+              <input id="cf-exclude-solved" type="checkbox" />
+              <span>排除已 AC</span>
+            </label>
+            <!-- 默认隐藏，左侧增加一条指示线产生视觉关联 -->
+            <div id="cf-handle-wrapper" class="cf-handle" style="display: none; margin-left: 24px; margin-top: 4px; padding-left: 10px; border-left: 2px solid var(--primary, #007bff);">
+              <label for="cf-handle" style="display: block; margin-bottom: 4px;">Codeforces 账号</label>
+              <input id="cf-handle" class="input-sm" placeholder="例如：tourist" style="width: 100%; max-width: 200px;" />
+              <div id="cf-handle-msg" class="small" style="margin-top:4px; color: var(--muted); min-height: 18px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="cf-random-run" class="btn-primary">抽取并加入当前题单</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 登录弹窗 -->
+  <div id="auth-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="auth-title">账号登录</h2>
+        <button id="auth-close" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="small" style="margin-bottom:8px; color: var(--muted);">选择登录方式（目前仅支持GitHub）</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+          <button id="oauth-github" class="btn-primary">使用 GitHub 登录</button>
+          <button id="oauth-google" class="btn-primary">使用 Google 登录</button>
+        </div>
+
+        <div class="small" style="margin:8px 0; color: var(--muted);">或使用邮箱密码</div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+          <div style="min-width:260px; flex:1;">
+            <div class="small">邮箱</div>
+            <input id="auth-email" class="input-sm" type="email" autocomplete="username" placeholder="you@example.com" />
+          </div>
+          <div style="min-width:220px; flex:1;">
+            <div class="small">密码</div>
+            <input id="auth-password" class="input-sm" type="password" autocomplete="current-password" placeholder="********" />
+          </div>
+        </div>
+        <div id="auth-msg" class="small" style="margin-top:8px; color: var(--muted);"></div>
+      </div>
+      <div class="modal-footer">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="auth-login" class="btn-primary">登录</button>
+          <button id="auth-signup">注册并登录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 高级筛选 -->
+  <div id="filter-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="filter-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="filter-title">筛选</h2>
+        <button id="filter-close" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <div style="min-width:200px;">
+            <div class="small">难度最小</div>
+            <input id="f-diff-min" class="input-sm" type="number" placeholder="如 1200" />
+          </div>
+          <div style="min-width:200px;">
+            <div class="small">难度最大</div>
+            <input id="f-diff-max" class="input-sm" type="number" placeholder="如 1800" />
+          </div>
+          <div style="min-width:260px; flex:1;">
+            <div class="small">标签（AND，全部包含）</div>
+            <input id="f-tags-all" class="input-sm" placeholder="如 dp, graph" />
+          </div>
+          <div style="min-width:260px; flex:1;">
+            <div class="small">标签（OR，任一包含）</div>
+            <input id="f-tags-any" class="input-sm" placeholder="如 math, greedy" />
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <div class="small">来源站点</div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:6px;">
+            <label><input id="f-site-cf" type="checkbox" /> Codeforces</label>
+            <label><input id="f-site-at" type="checkbox" /> AtCoder</label>
+            <label><input id="f-site-luogu" type="checkbox" /> 洛谷</label>
+            <label><input id="f-site-other" type="checkbox" /> 其他</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div style="display:flex; gap:8px;">
+          <button id="filter-apply" class="btn-primary">应用</button>
+          <button id="filter-reset" class="btn-ghost">清空</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase 客户端与配置：加 defer -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
+  <script defer src="./supabase-config.js"></script>
+  <script defer src="./app.js"></script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
